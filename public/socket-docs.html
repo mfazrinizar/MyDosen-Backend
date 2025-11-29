@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyDosen Socket.IO Documentation</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #fafafa;
+      color: #3b4151;
+      line-height: 1.6;
+    }
+    
+    .topbar {
+      background: #1b1b1b;
+      padding: 15px 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .topbar h1 {
+      color: #fff;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    
+    .topbar .badge {
+      background: #49cc90;
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 30px;
+    }
+    
+    .info-section {
+      background: #fff;
+      border-radius: 8px;
+      padding: 25px;
+      margin-bottom: 25px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .info-section h2 {
+      color: #3b4151;
+      font-size: 1.5rem;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    
+    .info-section h3 {
+      color: #3b4151;
+      font-size: 1.1rem;
+      margin: 20px 0 10px;
+    }
+    
+    .connection-url {
+      background: #41444e;
+      color: #fff;
+      padding: 15px 20px;
+      border-radius: 6px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 1rem;
+      margin: 15px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .connection-url .label {
+      background: #61affe;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    
+    .event-card {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      overflow: hidden;
+    }
+    
+    .event-header {
+      padding: 15px 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      transition: background 0.2s;
+    }
+    
+    .event-header:hover {
+      background: #f7f7f7;
+    }
+    
+    .event-header.client-event {
+      border-left: 4px solid #49cc90;
+    }
+    
+    .event-header.server-event {
+      border-left: 4px solid #61affe;
+    }
+    
+    .event-badge {
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      min-width: 80px;
+      text-align: center;
+    }
+    
+    .event-badge.emit {
+      background: #49cc90;
+      color: #fff;
+    }
+    
+    .event-badge.on {
+      background: #61affe;
+      color: #fff;
+    }
+    
+    .event-name {
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #3b4151;
+    }
+    
+    .event-desc {
+      color: #6b6b6b;
+      font-size: 0.9rem;
+      flex: 1;
+    }
+    
+    .event-toggle {
+      color: #6b6b6b;
+      font-size: 1.2rem;
+      transition: transform 0.2s;
+    }
+    
+    .event-card.open .event-toggle {
+      transform: rotate(180deg);
+    }
+    
+    .event-body {
+      display: none;
+      padding: 20px;
+      background: #fafafa;
+      border-top: 1px solid #e8e8e8;
+    }
+    
+    .event-card.open .event-body {
+      display: block;
+    }
+    
+    .payload-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+    }
+    
+    .payload-table th,
+    .payload-table td {
+      text-align: left;
+      padding: 10px 15px;
+      border: 1px solid #e8e8e8;
+    }
+    
+    .payload-table th {
+      background: #f0f0f0;
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+    }
+    
+    .payload-table td {
+      font-size: 0.9rem;
+    }
+    
+    .payload-table code {
+      background: #e8e8e8;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.85rem;
+    }
+    
+    .code-block {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 20px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      margin: 15px 0;
+    }
+    
+    .code-block .comment {
+      color: #6a9955;
+    }
+    
+    .code-block .string {
+      color: #ce9178;
+    }
+    
+    .code-block .keyword {
+      color: #569cd6;
+    }
+    
+    .code-block .function {
+      color: #dcdcaa;
+    }
+    
+    .auth-methods {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-top: 15px;
+    }
+    
+    .auth-method {
+      background: #f7f7f7;
+      border: 1px solid #e8e8e8;
+      border-radius: 6px;
+      padding: 20px;
+    }
+    
+    .auth-method h4 {
+      color: #3b4151;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .auth-method h4 .recommended {
+      background: #49cc90;
+      color: #fff;
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+    
+    .flow-steps {
+      background: #f7f7f7;
+      border-radius: 6px;
+      padding: 20px;
+      margin: 15px 0;
+    }
+    
+    .flow-steps ol {
+      margin-left: 20px;
+    }
+    
+    .flow-steps li {
+      margin: 8px 0;
+      color: #3b4151;
+    }
+    
+    .privacy-notes {
+      background: #fff4e5;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 20px;
+      margin-top: 15px;
+    }
+    
+    .privacy-notes h4 {
+      color: #856404;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .privacy-notes ul {
+      margin-left: 20px;
+      color: #856404;
+    }
+    
+    .privacy-notes li {
+      margin: 5px 0;
+    }
+
+    .section-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .section-tab {
+      padding: 10px 20px;
+      border: none;
+      background: #e8e8e8;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .section-tab:hover {
+      background: #d0d0d0;
+    }
+
+    .section-tab.active {
+      background: #3b4151;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>🔌 MyDosen Socket.IO API</h1>
+    <span class="badge">v1.0.0</span>
+  </div>
+  
+  <div class="container">
+    <!-- Connection Info -->
+    <div class="info-section">
+      <h2>🌐 Connection</h2>
+      <p>Connect to the Socket.IO server using the following URL:</p>
+      <div class="connection-url">
+        <span class="label">SOCKET</span>
+        <span id="socket-url">ws://localhost:3000</span>
+      </div>
+      <p><strong>Path:</strong> <code>/api/v1/io</code></p>
+      
+      <h3>Authentication</h3>
+      <p>All connections require a valid JWT token obtained from <code>POST /api/v1/auth/login</code></p>
+      
+      <div class="auth-methods">
+        <div class="auth-method">
+          <h4>Auth Object <span class="recommended">Recommended</span></h4>
+          <div class="code-block">
+<span class="keyword">const</span> socket = <span class="function">io</span>(<span class="string">'http://localhost:3000'</span>, {
+  <span class="keyword">path</span>: <span class="string">'/api/v1/io'</span>,
+  <span class="keyword">auth</span>: {
+    <span class="keyword">token</span>: <span class="string">'your-jwt-token'</span>
+  }
+});
+          </div>
+        </div>
+        
+        <div class="auth-method">
+          <h4>Query Parameter</h4>
+          <div class="code-block">
+<span class="keyword">const</span> socket = <span class="function">io</span>(<span class="string">'http://localhost:3000'</span>, {
+  <span class="keyword">path</span>: <span class="string">'/api/v1/io'</span>,
+  <span class="keyword">query</span>: {
+    <span class="keyword">token</span>: <span class="string">'your-jwt-token'</span>
+  }
+});
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Client to Server Events -->
+    <div class="info-section">
+      <h2>📤 Client → Server Events</h2>
+      <p>Events that clients emit to the server</p>
+      
+      <!-- update_location -->
+      <div class="event-card" onclick="this.classList.toggle('open')">
+        <div class="event-header client-event">
+          <span class="event-badge emit">EMIT</span>
+          <span class="event-name">update_location</span>
+          <span class="event-desc">Update Dosen location (Dosen only)</span>
+          <span class="event-toggle">▼</span>
+        </div>
+        <div class="event-body">
+          <h4>Payload</h4>
+          <table class="payload-table">
+            <tr><th>Field</th><th>Type</th><th>Description</th><th>Example</th></tr>
+            <tr><td><code>lat</code></td><td>number</td><td>Latitude coordinate</td><td>-3.219</td></tr>
+            <tr><td><code>long</code></td><td>number</td><td>Longitude coordinate</td><td>104.64</td></tr>
+          </table>
+          <h4>Example</h4>
+          <div class="code-block">
+socket.<span class="function">emit</span>(<span class="string">'update_location'</span>, { 
+  lat: <span class="number">-3.219</span>, 
+  long: <span class="number">104.64</span> 
+});
+          </div>
+          <p><strong>Response:</strong> <code>location_updated</code> event with processed location data</p>
+        </div>
+      </div>
+      
+      <!-- join_dosen_room -->
+      <div class="event-card" onclick="this.classList.toggle('open')">
+        <div class="event-header client-event">
+          <span class="event-badge emit">EMIT</span>
+          <span class="event-name">join_dosen_room</span>
+          <span class="event-desc">Join a Dosen tracking room (Mahasiswa only)</span>
+          <span class="event-toggle">▼</span>
+        </div>
+        <div class="event-body">
+          <h4>Payload</h4>
+          <table class="payload-table">
+            <tr><th>Field</th><th>Type</th><th>Description</th><th>Example</th></tr>
+            <tr><td><code>dosenId</code></td><td>string (UUID)</td><td>The Dosen user ID to track</td><td>"550e8400-e29b-41d4-..."</td></tr>
+          </table>
+          <h4>Example</h4>
+          <div class="code-block">
+socket.<span class="function">emit</span>(<span class="string">'join_dosen_room'</span>, { 
+  dosenId: <span class="string">'550e8400-e29b-41d4-a716-446655440003'</span>
+});
+          </div>
+          <p><strong>Response:</strong> <code>room_joined</code> on success, <code>error</code> on failure</p>
+          <p><strong>Note:</strong> Requires approved tracking permission</p>
+        </div>
+      </div>
+      
+      <!-- leave_dosen_room -->
+      <div class="event-card" onclick="this.classList.toggle('open')">
+        <div class="event-header client-event">
+          <span class="event-badge emit">EMIT</span>
+          <span class="event-name">leave_dosen_room</span>
+          <span class="event-desc">Leave a Dosen tracking room</span>
+          <span class="event-toggle">▼</span>
+        </div>
+        <div class="event-body">
+          <h4>Payload</h4>
+          <table class="payload-table">
+            <tr><th>Field</th><th>Type</th><th>Description</th><th>Example</th></tr>
+            <tr><td><code>dosenId</code></td><td>string (UUID)</td><td>The Dosen room to leave</td><td>"550e8400-e29b-41d4-..."</td></tr>
+          </table>
+          <h4>Example</h4>
+          <div class="code-block">
+socket.<span class="function">emit</span>(<span class="string">'leave_dosen_room'</span>, { 
+  dosenId: <span class="string">'550e8400-e29b-41d4-a716-446655440003'</span>
+});
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Server to Client Events -->
+    <div class="info-section">
+      <h2>📥 Server → Client Events</h2>
+      <p>Events that clients listen for from the server</p>
+      
+      <!-- dosen_moved -->
+      <div class="event-card" onclick="this.classList.toggle('open')">
+        <div class="event-header server-event">
+          <span class="event-badge on">ON</span>
+          <span class="event-name">dosen_moved</span>
+          <span class="event-desc">Broadcasted when a Dosen updates their location</span>
+          <span class="event-toggle">▼</span>
+        </div>
+        <div class="event-body">
+          <h4>Payload</h4>
+          <table class="payload-table">
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+            <tr><td><code>dosenId</code></td><td>string (UUID)</td><td>Dosen user ID</td></tr>
+            <tr><td><code>name</code></td><td>string</td><td>Dosen name</td></tr>
+            <tr><td><code>latitude</code></td><td>number</td><td>Latitude (may be masked)</td></tr>
+            <tr><td><code>longitude</code></td><td>number</td><td>Longitude (may be masked)</td></tr>
+            <tr><td><code>position_name</code></td><td>string</td><td>Location name or "Di Luar"</td></tr>
+            <tr><td><code>isInside</code></td><td>boolean</td><td>Inside geofence?</td></tr>
+            <tr><td><code>timestamp</code></td><td>string (ISO)</td><td>Update timestamp</td></tr>
+          </table>
+          <h4>Example</h4>
+          <div class="code-block">
+socket.<span class="function">on</span>(<span class="string">'dosen_moved'</span>, (data) => {
+  console.<span class="function">log</span>(<span class="string">'Dosen moved:'</span>, data.position_name);
+  <span class="comment">// Update map marker</span>
+  updateMarker(data.latitude, data.longitude);
+});
+          </div>
+        </div>
+      </div>
+      
+      <!-- dosen_status -->
+      <div class="event-card" onclick="this.classList.toggle('open')">
+        <div class="event-header server-event">
+          <span class="event-badge on">ON</span>
+          <span class="event-name">dosen_status</span>
+          <span class="event-desc">Broadcasted when a Dosen goes online/offline</span>
+          <span class="event-toggle">▼</span>
+        </div>
+        <div class="event-body">
+          <h4>Payload</h4>
+          <table class="payload-table">
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+            <tr><td><code>dosenId</code></td><td>string (UUID)</td><td>Dosen user ID</td></tr>
+            <tr><td><code>name</code></td><td>string</td><td>Dosen name</td></tr>
+            <tr><td><code>online</code></td><td>boolean</td><td>Online status</td></tr>
+          </table>
+          <h4>Example</h4>
+          <div class="code-block">
+socket.<span class="function">on</span>(<span class="string">'dosen_status'</span>, (data) => {
+  <span class="keyword">const</span> status = data.online ? <span class="string">'Online'</span> : <span class="string">'Offline'</span>;
+  console.<span class="function">log</span>(<span class="string">`${data.name} is now ${status}`</span>);
+});
+          </div>
+        </div>
+      </div>
+      
+      <!-- room_joined -->
+      <div class="event-card" onclick="this.classList.toggle('open')">
+        <div class="event-header server-event">
+          <span class="event-badge on">ON</span>
+          <span class="event-name">room_joined</span>
+          <span class="event-desc">Confirmation when successfully joined a room</span>
+          <span class="event-toggle">▼</span>
+        </div>
+        <div class="event-body">
+          <h4>Payload</h4>
+          <table class="payload-table">
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+            <tr><td><code>dosenId</code></td><td>string (UUID)</td><td>Dosen user ID</td></tr>
+            <tr><td><code>room</code></td><td>string</td><td>Room name joined</td></tr>
+            <tr><td><code>message</code></td><td>string</td><td>Success message</td></tr>
+          </table>
+          <h4>Example</h4>
+          <div class="code-block">
+socket.<span class="function">on</span>(<span class="string">'room_joined'</span>, (data) => {
+  console.<span class="function">log</span>(<span class="string">'Joined room:'</span>, data.room);
+});
+          </div>
+        </div>
+      </div>
+      
+      <!-- location_updated -->
+      <div class="event-card" onclick="this.classList.toggle('open')">
+        <div class="event-header server-event">
+          <span class="event-badge on">ON</span>
+          <span class="event-name">location_updated</span>
+          <span class="event-desc">Acknowledgment when location update is processed</span>
+          <span class="event-toggle">▼</span>
+        </div>
+        <div class="event-body">
+          <h4>Payload</h4>
+          <table class="payload-table">
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+            <tr><td><code>success</code></td><td>boolean</td><td>Whether update was successful</td></tr>
+            <tr><td><code>processed</code></td><td>object</td><td>Processed location data</td></tr>
+          </table>
+          <h4>Example</h4>
+          <div class="code-block">
+socket.<span class="function">on</span>(<span class="string">'location_updated'</span>, (data) => {
+  <span class="keyword">if</span> (data.success) {
+    console.<span class="function">log</span>(<span class="string">'Location saved at:'</span>, data.processed.position_name);
+  }
+});
+          </div>
+        </div>
+      </div>
+      
+      <!-- error -->
+      <div class="event-card" onclick="this.classList.toggle('open')">
+        <div class="event-header server-event">
+          <span class="event-badge on" style="background:#f93e3e">ON</span>
+          <span class="event-name">error</span>
+          <span class="event-desc">Error event for failed operations</span>
+          <span class="event-toggle">▼</span>
+        </div>
+        <div class="event-body">
+          <h4>Payload</h4>
+          <table class="payload-table">
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+            <tr><td><code>message</code></td><td>string</td><td>Error message</td></tr>
+          </table>
+          <h4>Example</h4>
+          <div class="code-block">
+socket.<span class="function">on</span>(<span class="string">'error'</span>, (data) => {
+  console.<span class="function">error</span>(<span class="string">'Socket error:'</span>, data.message);
+});
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Flow Examples -->
+    <div class="info-section">
+      <h2>📋 Usage Examples</h2>
+      
+      <h3>Complete Connection Example</h3>
+      <div class="code-block">
+<span class="comment">// 1. Login to get JWT token</span>
+<span class="keyword">const</span> response = <span class="keyword">await</span> <span class="function">fetch</span>(<span class="string">'http://localhost:3000/api/v1/auth/login'</span>, {
+  method: <span class="string">'POST'</span>,
+  headers: { <span class="string">'Content-Type'</span>: <span class="string">'application/json'</span> },
+  body: JSON.<span class="function">stringify</span>({
+    email: <span class="string">'dosen1@unsri.ac.id'</span>,
+    password: <span class="string">'dosen123'</span>
+  })
+});
+<span class="keyword">const</span> { token } = <span class="keyword">await</span> response.<span class="function">json</span>();
+
+<span class="comment">// 2. Connect to Socket.IO</span>
+<span class="keyword">const</span> socket = <span class="function">io</span>(<span class="string">'http://localhost:3000'</span>, {
+  path: <span class="string">'/api/v1/io'</span>,
+  auth: { token }
+});
+
+<span class="comment">// 3. Handle connection</span>
+socket.<span class="function">on</span>(<span class="string">'connect'</span>, () => {
+  console.<span class="function">log</span>(<span class="string">'Connected!'</span>);
+});
+
+socket.<span class="function">on</span>(<span class="string">'connect_error'</span>, (err) => {
+  console.<span class="function">error</span>(<span class="string">'Connection failed:'</span>, err.message);
+});
+      </div>
+      
+      <h3>Dosen: Update Location</h3>
+      <div class="flow-steps">
+        <ol>
+          <li>Login via <code>POST /api/v1/auth/login</code></li>
+          <li>Connect to Socket.IO with JWT token</li>
+          <li>Emit <code>update_location</code> with coordinates</li>
+          <li>Receive <code>location_updated</code> acknowledgment</li>
+        </ol>
+      </div>
+      <div class="code-block">
+<span class="comment">// Dosen updates location periodically</span>
+<span class="function">setInterval</span>(() => {
+  navigator.geolocation.<span class="function">getCurrentPosition</span>((pos) => {
+    socket.<span class="function">emit</span>(<span class="string">'update_location'</span>, {
+      lat: pos.coords.latitude,
+      long: pos.coords.longitude
+    });
+  });
+}, <span class="number">5000</span>);
+      </div>
+      
+      <h3>Mahasiswa: Track Dosen</h3>
+      <div class="flow-steps">
+        <ol>
+          <li>Login via <code>POST /api/v1/auth/login</code></li>
+          <li>Get approved Dosen via <code>GET /api/v1/tracking/allowed-dosen</code></li>
+          <li>Connect to Socket.IO with JWT token</li>
+          <li>Emit <code>join_dosen_room</code> with dosenId</li>
+          <li>Listen for <code>dosen_moved</code> and <code>dosen_status</code></li>
+        </ol>
+      </div>
+      <div class="code-block">
+<span class="comment">// Mahasiswa tracks a Dosen</span>
+socket.<span class="function">emit</span>(<span class="string">'join_dosen_room'</span>, { dosenId: <span class="string">'dosen-uuid'</span> });
+
+socket.<span class="function">on</span>(<span class="string">'dosen_moved'</span>, (data) => {
+  <span class="function">updateMapMarker</span>(data.latitude, data.longitude);
+  <span class="function">showLabel</span>(data.position_name);
+});
+
+socket.<span class="function">on</span>(<span class="string">'dosen_status'</span>, (data) => {
+  <span class="function">updateOnlineStatus</span>(data.dosenId, data.online);
+});
+      </div>
+      
+      <div class="privacy-notes">
+        <h4>⚠️ Privacy Notes</h4>
+        <ul>
+          <li>Location data is <strong>masked</strong> when Dosen is outside defined geofences</li>
+          <li>Masked coordinates show Jakarta location (-6.2088, 106.8456)</li>
+          <li>Masked location shows <code>position_name</code> as "Di Luar"</li>
+          <li>Location is only persisted to database every <strong>60 seconds</strong> (throttled)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Update socket URL based on current host
+    const host = window.location.host;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    document.getElementById('socket-url').textContent = `${protocol}//${host}`;
+  </script>
+</body>
+</html>
