@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyDosen Simulator</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    h1 { text-align: center; margin-bottom: 20px; color: #00d9ff; }
+    .grid { display: grid; grid-template-columns: 300px 1fr 350px; gap: 20px; }
+    .panel { background: #16213e; border-radius: 12px; padding: 20px; }
+    .panel h2 { color: #00d9ff; margin-bottom: 15px; font-size: 16px; border-bottom: 1px solid #0f3460; padding-bottom: 10px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; color: #aaa; font-size: 13px; }
+    .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #0f3460; border-radius: 6px; background: #0f3460; color: #fff; font-size: 14px; }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: #00d9ff; }
+    .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; width: 100%; margin-bottom: 10px; }
+    .btn-primary { background: #00d9ff; color: #1a1a2e; }
+    .btn-primary:hover { background: #00b8d9; }
+    .btn-success { background: #00c853; color: #fff; }
+    .btn-success:hover { background: #00a844; }
+    .btn-danger { background: #ff4757; color: #fff; }
+    .btn-danger:hover { background: #ff3344; }
+    .btn-warning { background: #ffa502; color: #1a1a2e; }
+    .btn-warning:hover { background: #e69500; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 15px; }
+    .status.connected { background: rgba(0, 200, 83, 0.2); color: #00c853; }
+    .status.disconnected { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
+    .status.info { background: rgba(0, 217, 255, 0.2); color: #00d9ff; }
+    .log-container { height: 500px; overflow-y: auto; background: #0f0f1a; border-radius: 8px; padding: 15px; font-family: 'Consolas', monospace; font-size: 12px; }
+    .log-entry { padding: 6px 0; border-bottom: 1px solid #1a1a2e; }
+    .log-entry:last-child { border-bottom: none; }
+    .log-time { color: #666; margin-right: 10px; }
+    .log-type { padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-right: 8px; text-transform: uppercase; }
+    .log-type.emit { background: #00d9ff; color: #1a1a2e; }
+    .log-type.receive { background: #00c853; color: #fff; }
+    .log-type.error { background: #ff4757; color: #fff; }
+    .log-type.info { background: #ffa502; color: #1a1a2e; }
+    .log-type.api { background: #a855f7; color: #fff; }
+    .log-msg { color: #ccc; }
+    .log-data { color: #888; font-size: 11px; margin-top: 4px; display: block; word-break: break-all; }
+    .user-info { background: #0f3460; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+    .user-info p { margin: 5px 0; font-size: 13px; }
+    .user-info strong { color: #00d9ff; }
+    .actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .coord-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .quick-loc { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px; }
+    .quick-loc button { padding: 6px; font-size: 11px; }
+    .dosen-list { max-height: 200px; overflow-y: auto; }
+    .dosen-item { padding: 10px; background: #0f3460; border-radius: 6px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+    .dosen-item:hover { background: #1a4a7a; }
+    .dosen-item.tracking { border: 2px solid #00c853; }
+    .dosen-item .name { font-weight: 600; color: #fff; }
+    .dosen-item .meta { font-size: 11px; color: #888; margin-top: 4px; }
+    .dosen-item .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .dosen-item .status-dot.online { background: #00c853; }
+    .dosen-item .status-dot.offline { background: #666; }
+    .location-display { background: #0f3460; border-radius: 8px; padding: 15px; margin-top: 15px; }
+    .location-display h3 { font-size: 14px; color: #00d9ff; margin-bottom: 10px; }
+    .location-display .coords { font-family: monospace; font-size: 13px; }
+    .tabs { display: flex; gap: 5px; margin-bottom: 15px; }
+    .tab { padding: 8px 16px; background: #0f3460; border: none; color: #aaa; cursor: pointer; border-radius: 6px; font-size: 13px; }
+    .tab.active { background: #00d9ff; color: #1a1a2e; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .clear-btn { background: transparent; border: 1px solid #ff4757; color: #ff4757; padding: 6px 12px; font-size: 11px; float: right; margin-bottom: 10px; }
+    .clear-btn:hover { background: #ff4757; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎓 MyDosen Interactive Simulator</h1>
+    
+    <div class="grid">
+      <!-- Left Panel: Auth & Connection -->
+      <div class="panel">
+        <h2>🔐 Authentication</h2>
+        
+        <div id="authSection">
+          <div class="form-group">
+            <label>Quick Login As:</label>
+            <select id="quickLogin">
+              <option value="">-- Select User --</option>
+              <option value="admin@unsri.ac.id|admin123">Admin (admin@unsri.ac.id)</option>
+              <option value="dosen1@unsri.ac.id|dosen123">Dosen (dosen1@unsri.ac.id)</option>
+              <option value="mahasiswa1@unsri.ac.id|mahasiswa123">Mahasiswa (mahasiswa1@unsri.ac.id)</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label>Or Enter Credentials:</label>
+            <input type="email" id="email" placeholder="Email">
+          </div>
+          <div class="form-group">
+            <input type="password" id="password" placeholder="Password">
+          </div>
+          
+          <button class="btn btn-primary" id="loginBtn">Login</button>
+        </div>
+        
+        <div id="userSection" style="display: none;">
+          <div class="user-info">
+            <p><strong>Name:</strong> <span id="userName"></span></p>
+            <p><strong>Role:</strong> <span id="userRole"></span></p>
+            <p><strong>Email:</strong> <span id="userEmail"></span></p>
+            <p><strong>ID:</strong> <span id="userId" style="font-size:10px;"></span></p>
+          </div>
+          <button class="btn btn-danger" id="logoutBtn">Logout</button>
+        </div>
+        
+        <hr style="border-color: #0f3460; margin: 20px 0;">
+        
+        <h2>🔌 Socket.IO Connection</h2>
+        <div id="socketStatus" class="status disconnected">● Disconnected</div>
+        <button class="btn btn-success" id="connectBtn" disabled>Connect Socket</button>
+        <button class="btn btn-danger" id="disconnectBtn" style="display:none;">Disconnect</button>
+      </div>
+      
+      <!-- Middle Panel: Actions -->
+      <div class="panel">
+        <div class="tabs">
+          <button class="tab active" data-tab="dosen">Dosen Actions</button>
+          <button class="tab" data-tab="mahasiswa">Mahasiswa Actions</button>
+          <button class="tab" data-tab="admin">Admin Actions</button>
+        </div>
+        
+        <!-- Dosen Tab -->
+        <div id="dosen-tab" class="tab-content active">
+          <h2>📍 Update Location (Socket.IO)</h2>
+          <div class="coord-inputs">
+            <div class="form-group">
+              <label>Latitude</label>
+              <input type="number" id="latitude" step="0.0001" value="-3.2195">
+            </div>
+            <div class="form-group">
+              <label>Longitude</label>
+              <input type="number" id="longitude" step="0.0001" value="104.6477">
+            </div>
+          </div>
+          
+          <button class="btn btn-primary" id="updateLocationBtn" disabled>📡 Emit update_location</button>
+          
+          <div class="quick-loc">
+            <button class="btn btn-warning" onclick="setLocation(-3.2195, 104.6477)">UNSRI Indralaya</button>
+            <button class="btn btn-warning" onclick="setLocation(-2.9761, 104.7754)">UNSRI Palembang</button>
+            <button class="btn btn-warning" onclick="setLocation(-6.2088, 106.8456)">Jakarta (Outside)</button>
+            <button class="btn btn-warning" onclick="setLocation(-3.2200, 104.6490)">Move Slightly</button>
+          </div>
+          
+          <div class="location-display" id="currentLocation" style="display:none;">
+            <h3>📌 Current Broadcast Location</h3>
+            <div class="coords">
+              <p>Lat: <span id="dispLat">-</span></p>
+              <p>Lng: <span id="dispLng">-</span></p>
+              <p>Position: <span id="dispPos">-</span></p>
+            </div>
+          </div>
+          
+          <hr style="border-color: #0f3460; margin: 20px 0;">
+          
+          <h2>📋 Pending Tracking Requests</h2>
+          <button class="btn btn-primary" id="loadPendingBtn">Load Pending Requests</button>
+          <div id="pendingList" style="margin-top: 15px; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+        
+        <!-- Mahasiswa Tab -->
+        <div id="mahasiswa-tab" class="tab-content">
+          <h2>👨‍🏫 Available Dosen</h2>
+          <button class="btn btn-primary" id="loadDosenBtn">Load Dosen List</button>
+          
+          <div class="dosen-list" id="dosenList" style="margin-top: 15px;"></div>
+          
+          <h2 style="margin-top: 20px;">📋 My Tracking Permissions</h2>
+          <button class="btn btn-primary" id="loadPermissionsBtn">Check My Permissions</button>
+          <div id="permissionsList" style="margin-top: 10px;"></div>
+          
+          <div class="location-display" id="trackedLocation" style="display:none;">
+            <h3>📡 Tracked Dosen Location</h3>
+            <div class="coords">
+              <p>Dosen: <span id="trackedName">-</span></p>
+              <p>Lat: <span id="trackedLat">-</span></p>
+              <p>Lng: <span id="trackedLng">-</span></p>
+              <p>Position: <span id="trackedPos">-</span></p>
+              <p>Status: <span id="trackedStatus">-</span></p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Admin Tab -->
+        <div id="admin-tab" class="tab-content">
+          <h2>👥 User Management</h2>
+          <button class="btn btn-primary" id="loadUsersBtn">Load All Users</button>
+          <div id="usersList" style="margin-top: 15px; max-height: 300px; overflow-y: auto;"></div>
+          
+          <hr style="border-color: #0f3460; margin: 20px 0;">
+          
+          <h2>➕ Create New User</h2>
+          <div class="form-group">
+            <input type="text" id="newName" placeholder="Full Name">
+          </div>
+          <div class="form-group">
+            <input type="email" id="newEmail" placeholder="Email">
+          </div>
+          <div class="form-group">
+            <input type="password" id="newPassword" placeholder="Password">
+          </div>
+          <div class="form-group">
+            <select id="newRole">
+              <option value="mahasiswa">Mahasiswa</option>
+              <option value="dosen">Dosen</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group" id="nimField">
+            <input type="text" id="newNim" placeholder="NIM (for Mahasiswa)">
+          </div>
+          <div class="form-group" id="nidnField" style="display:none;">
+            <input type="text" id="newNidn" placeholder="NIDN (for Dosen)">
+          </div>
+          <div class="form-group" id="nipField" style="display:none;">
+            <input type="text" id="newNip" placeholder="NIP (for Admin)">
+          </div>
+          <button class="btn btn-success" id="createUserBtn">Create User</button>
+        </div>
+      </div>
+      
+      <!-- Right Panel: Logs -->
+      <div class="panel">
+        <h2>📜 Event Log <button class="btn clear-btn" onclick="clearLogs()">Clear</button></h2>
+        <div class="log-container" id="logContainer"></div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // State
+    let token = null;
+    let currentUser = null;
+    let socket = null;
+    let trackingDosenId = null;
+    let dosenData = {};
+    
+    const API_BASE = '/api/v1';
+    const SOCKET_PATH = '/api/v1/io';
+    
+    // DOM Elements
+    const logContainer = document.getElementById('logContainer');
+    
+    // Logging
+    function log(type, message, data = null) {
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `
+        <span class="log-time">${time}</span>
+        <span class="log-type ${type}">${type}</span>
+        <span class="log-msg">${message}</span>
+        ${data ? `<span class="log-data">${JSON.stringify(data, null, 2)}</span>` : ''}
+      `;
+      logContainer.insertBefore(entry, logContainer.firstChild);
+    }
+    
+    function clearLogs() {
+      logContainer.innerHTML = '';
+    }
+    
+    // API Calls
+    async function apiCall(method, endpoint, body = null) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      
+      const options = { method, headers };
+      if (body) options.body = JSON.stringify(body);
+      
+      log('api', `${method} ${endpoint}`, body);
+      
+      try {
+        const res = await fetch(`${API_BASE}${endpoint}`, options);
+        const data = await res.json();
+        
+        if (!res.ok) {
+          log('error', `API Error: ${data.error || res.statusText}`);
+          return { error: data.error || res.statusText };
+        }
+        
+        log('receive', `Response from ${endpoint}`, data);
+        return data;
+      } catch (err) {
+        log('error', `Network error: ${err.message}`);
+        return { error: err.message };
+      }
+    }
+    
+    // Auth
+    document.getElementById('quickLogin').addEventListener('change', (e) => {
+      if (e.target.value) {
+        const [email, password] = e.target.value.split('|');
+        document.getElementById('email').value = email;
+        document.getElementById('password').value = password;
+      }
+    });
+    
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      if (!email || !password) {
+        log('error', 'Email and password required');
+        return;
+      }
+      
+      const res = await apiCall('POST', '/auth/login', { email, password });
+      
+      if (res.token) {
+        token = res.token;
+        currentUser = res.user;
+        
+        // Update UI
+        document.getElementById('authSection').style.display = 'none';
+        document.getElementById('userSection').style.display = 'block';
+        document.getElementById('userName').textContent = currentUser.name;
+        document.getElementById('userRole').textContent = currentUser.role.toUpperCase();
+        document.getElementById('userEmail').textContent = email;
+        document.getElementById('userId').textContent = currentUser.id;
+        document.getElementById('connectBtn').disabled = false;
+        
+        log('info', `Logged in as ${currentUser.role}: ${currentUser.name}`);
+        
+        // Switch to appropriate tab
+        if (currentUser.role === 'dosen') {
+          switchTab('dosen');
+        } else if (currentUser.role === 'mahasiswa') {
+          switchTab('mahasiswa');
+        } else {
+          switchTab('admin');
+        }
+      }
+    });
+    
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      if (socket) socket.disconnect();
+      token = null;
+      currentUser = null;
+      
+      document.getElementById('authSection').style.display = 'block';
+      document.getElementById('userSection').style.display = 'none';
+      document.getElementById('connectBtn').disabled = true;
+      document.getElementById('email').value = '';
+      document.getElementById('password').value = '';
+      document.getElementById('quickLogin').value = '';
+      
+      log('info', 'Logged out');
+    });
+    
+    // Socket.IO
+    document.getElementById('connectBtn').addEventListener('click', () => {
+      if (!token) {
+        log('error', 'Login first to connect');
+        return;
+      }
+      
+      log('info', `Connecting to Socket.IO at ${window.location.origin} with path ${SOCKET_PATH}`);
+      
+      socket = io(window.location.origin, {
+        path: SOCKET_PATH,
+        auth: { token }
+      });
+      
+      socket.on('connect', () => {
+        log('info', `Socket connected! ID: ${socket.id}`);
+        document.getElementById('socketStatus').className = 'status connected';
+        document.getElementById('socketStatus').textContent = '● Connected';
+        document.getElementById('connectBtn').style.display = 'none';
+        document.getElementById('disconnectBtn').style.display = 'block';
+        document.getElementById('updateLocationBtn').disabled = false;
+      });
+      
+      socket.on('disconnect', (reason) => {
+        log('info', `Socket disconnected: ${reason}`);
+        document.getElementById('socketStatus').className = 'status disconnected';
+        document.getElementById('socketStatus').textContent = '● Disconnected';
+        document.getElementById('connectBtn').style.display = 'block';
+        document.getElementById('disconnectBtn').style.display = 'none';
+        document.getElementById('updateLocationBtn').disabled = true;
+      });
+      
+      socket.on('connect_error', (err) => {
+        log('error', `Connection error: ${err.message}`);
+      });
+      
+      // Server events - listen for location updates
+      socket.on('dosen_moved', (data) => {
+        log('receive', 'dosen_moved', data);
+        if (dosenData[data.dosen_id]) {
+          dosenData[data.dosen_id] = { ...dosenData[data.dosen_id], ...data };
+        }
+        updateTrackedLocation(data);
+      });
+      
+      socket.on('dosen_status', (data) => {
+        log('receive', 'dosen_status', data);
+        if (dosenData[data.dosen_id]) {
+          dosenData[data.dosen_id].is_online = data.is_online;
+        }
+        document.getElementById('trackedStatus').textContent = data.is_online ? '🟢 Online' : '⚫ Offline';
+      });
+      
+      // Error events
+      socket.on('error', (data) => {
+        log('error', 'Socket error', data);
+      });
+    });
+    
+    document.getElementById('disconnectBtn').addEventListener('click', () => {
+      if (socket) {
+        socket.disconnect();
+        socket = null;
+      }
+    });
+    
+    // Dosen Actions
+    function setLocation(lat, lng) {
+      document.getElementById('latitude').value = lat;
+      document.getElementById('longitude').value = lng;
+    }
+    
+    document.getElementById('updateLocationBtn').addEventListener('click', () => {
+      if (!socket || !socket.connected) {
+        log('error', 'Socket not connected');
+        return;
+      }
+      
+      const lat = parseFloat(document.getElementById('latitude').value);
+      const lng = parseFloat(document.getElementById('longitude').value);
+      
+      const payload = { latitude: lat, longitude: lng };
+      socket.emit('update_location', payload);
+      log('emit', 'update_location', payload);
+      
+      document.getElementById('currentLocation').style.display = 'block';
+      document.getElementById('dispLat').textContent = lat;
+      document.getElementById('dispLng').textContent = lng;
+    });
+    
+    // Dosen - Load pending requests (GET /tracking/pending)
+    document.getElementById('loadPendingBtn').addEventListener('click', async () => {
+      const res = await apiCall('GET', '/tracking/pending');
+      if (res.error) return;
+      
+      const list = document.getElementById('pendingList');
+      list.innerHTML = '';
+      
+      const requests = res.requests || res;
+      if (requests.length === 0) {
+        list.innerHTML = '<p style="color:#888;font-size:12px;">No pending requests.</p>';
+        return;
+      }
+      
+      requests.forEach(req => {
+        const item = document.createElement('div');
+        item.style.cssText = 'padding:10px;background:#0f3460;border-radius:6px;margin-bottom:8px;';
+        item.innerHTML = `
+          <strong style="color:#fff;">${req.student_name}</strong>
+          <div style="font-size:11px;color:#888;margin-top:4px;">NIM: ${req.nim || '-'} | ${req.student_email}</div>
+          <div style="font-size:10px;color:#666;margin-top:2px;">Requested: ${new Date(req.created_at).toLocaleString()}</div>
+          <div style="margin-top:8px;">
+            <button class="btn btn-success" style="width:auto;padding:5px 12px;font-size:11px;" onclick="handleRequest('${req.id}', 'approved')">✓ Approve</button>
+            <button class="btn btn-danger" style="width:auto;padding:5px 12px;font-size:11px;" onclick="handleRequest('${req.id}', 'rejected')">✗ Reject</button>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+    });
+    
+    // Dosen - Handle request (POST /tracking/handle)
+    async function handleRequest(permissionId, action) {
+      const res = await apiCall('POST', '/tracking/handle', { permission_id: permissionId, action: action });
+      if (!res.error) {
+        log('info', `Request ${action}: ${permissionId}`);
+        document.getElementById('loadPendingBtn').click();
+      }
+    }
+    
+    // Mahasiswa Actions - Load all dosen (GET /tracking/dosen)
+    document.getElementById('loadDosenBtn').addEventListener('click', async () => {
+      const res = await apiCall('GET', '/tracking/dosen');
+      if (res.error) return;
+      
+      const list = document.getElementById('dosenList');
+      list.innerHTML = '';
+      
+      const dosenArray = res.dosen || res;
+      dosenArray.forEach(dosen => {
+        const dosenId = dosen.user_id || dosen.id;
+        dosenData[dosenId] = dosen;
+        const item = document.createElement('div');
+        item.className = 'dosen-item';
+        item.innerHTML = `
+          <span class="status-dot ${dosen.is_online ? 'online' : 'offline'}"></span>
+          <span class="name">${dosen.name}</span>
+          <div class="meta">NIDN: ${dosen.nidn || '-'} | Status: ${dosen.request_status || 'none'}</div>
+          <div class="meta">ID: ${dosenId.substring(0,8)}...</div>
+          <div style="margin-top:8px;">
+            <button class="btn btn-primary" style="width:auto;padding:5px 10px;font-size:11px;" onclick="requestTracking('${dosenId}')">Request Permission</button>
+            <button class="btn btn-success" style="width:auto;padding:5px 10px;font-size:11px;" onclick="joinRoom('${dosenId}')">Join Room</button>
+            <button class="btn btn-danger" style="width:auto;padding:5px 10px;font-size:11px;" onclick="leaveRoom('${dosenId}')">Leave</button>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+    });
+    
+    // Request tracking permission (POST /tracking/request)
+    async function requestTracking(dosenId) {
+      const res = await apiCall('POST', '/tracking/request', { lecturer_id: dosenId });
+      if (!res.error) {
+        log('info', `Tracking request sent for dosen ${dosenId}`);
+      }
+    }
+    
+    // Join dosen room via Socket.IO
+    function joinRoom(dosenId) {
+      if (!socket || !socket.connected) {
+        log('error', 'Socket not connected');
+        return;
+      }
+      socket.emit('join_dosen_room', { dosen_id: dosenId });
+      log('emit', 'join_dosen_room', { dosen_id: dosenId });
+      trackingDosenId = dosenId;
+      document.getElementById('trackedLocation').style.display = 'block';
+      document.getElementById('trackedName').textContent = dosenData[dosenId]?.name || dosenId;
+    }
+    
+    // Leave dosen room via Socket.IO
+    function leaveRoom(dosenId) {
+      if (!socket || !socket.connected) {
+        log('error', 'Socket not connected');
+        return;
+      }
+      socket.emit('leave_dosen_room', { dosen_id: dosenId });
+      log('emit', 'leave_dosen_room', { dosen_id: dosenId });
+      if (trackingDosenId === dosenId) {
+        trackingDosenId = null;
+        document.getElementById('trackedLocation').style.display = 'none';
+      }
+    }
+    
+    function updateTrackedLocation(data) {
+      document.getElementById('trackedLat').textContent = data.latitude;
+      document.getElementById('trackedLng').textContent = data.longitude;
+      document.getElementById('trackedPos').textContent = data.position_name || '-';
+    }
+    
+    // Load my tracking requests (GET /tracking/my-requests)
+    document.getElementById('loadPermissionsBtn').addEventListener('click', async () => {
+      const res = await apiCall('GET', '/tracking/my-requests');
+      if (res.error) return;
+      
+      const permList = document.getElementById('permissionsList');
+      permList.innerHTML = '';
+      
+      const requests = res.requests || res;
+      if (requests.length === 0) {
+        permList.innerHTML = '<p style="color:#888;font-size:12px;">No tracking requests found.</p>';
+        return;
+      }
+      
+      requests.forEach(req => {
+        const item = document.createElement('div');
+        item.style.cssText = 'padding:8px;background:#0f3460;border-radius:6px;margin-bottom:6px;font-size:12px;';
+        const statusColor = req.status === 'approved' ? '#00c853' : req.status === 'rejected' ? '#ff4757' : '#ffa502';
+        item.innerHTML = `
+          <strong style="color:#fff;">${req.lecturer_name || 'Dosen'}</strong>
+          <span style="background:${statusColor};color:#fff;padding:2px 6px;border-radius:3px;font-size:10px;margin-left:8px;">${req.status}</span>
+          <div style="color:#888;margin-top:4px;">Created: ${new Date(req.created_at).toLocaleString()}</div>
+        `;
+        permList.appendChild(item);
+      });
+    });
+    
+    // Admin Actions - Load all users (GET /admin/users)
+    document.getElementById('loadUsersBtn').addEventListener('click', async () => {
+      const res = await apiCall('GET', '/admin/users');
+      if (res.error) return;
+      
+      const list = document.getElementById('usersList');
+      list.innerHTML = '';
+      
+      const users = res.users || res;
+      users.forEach(user => {
+        const item = document.createElement('div');
+        item.style.cssText = 'padding:10px;background:#0f3460;border-radius:6px;margin-bottom:8px;';
+        item.innerHTML = `
+          <strong style="color:#fff;">${user.name}</strong>
+          <span style="background:${user.role === 'admin' ? '#ff4757' : user.role === 'dosen' ? '#00d9ff' : '#00c853'};color:#fff;padding:2px 6px;border-radius:3px;font-size:10px;margin-left:8px;">${user.role}</span>
+          <div style="font-size:11px;color:#888;margin-top:4px;">${user.email}</div>
+          <div style="font-size:10px;color:#666;margin-top:2px;">ID: ${user.id}</div>
+          <button class="btn btn-danger" style="width:auto;padding:4px 8px;font-size:10px;margin-top:8px;" onclick="deleteUser('${user.id}')">Delete</button>
+        `;
+        list.appendChild(item);
+      });
+    });
+    
+    // Delete user (DELETE /admin/users/:id)
+    async function deleteUser(userId) {
+      if (!confirm('Delete this user?')) return;
+      await apiCall('DELETE', `/admin/users/${userId}`);
+      document.getElementById('loadUsersBtn').click();
+    }
+    
+    document.getElementById('newRole').addEventListener('change', (e) => {
+      document.getElementById('nimField').style.display = e.target.value === 'mahasiswa' ? 'block' : 'none';
+      document.getElementById('nidnField').style.display = e.target.value === 'dosen' ? 'block' : 'none';
+      document.getElementById('nipField').style.display = e.target.value === 'admin' ? 'block' : 'none';
+    });
+    
+    // Create user (POST /admin/users)
+    document.getElementById('createUserBtn').addEventListener('click', async () => {
+      const role = document.getElementById('newRole').value;
+      const body = {
+        name: document.getElementById('newName').value,
+        email: document.getElementById('newEmail').value,
+        password: document.getElementById('newPassword').value,
+        role: role
+      };
+      
+      if (role === 'mahasiswa') body.nim = document.getElementById('newNim').value;
+      if (role === 'dosen') body.nidn = document.getElementById('newNidn').value;
+      if (role === 'admin') body.nip = document.getElementById('newNip').value;
+      
+      const res = await apiCall('POST', '/admin/users', body);
+      if (!res.error) {
+        log('info', `User created: ${body.name}`);
+        // Clear form
+        document.getElementById('newName').value = '';
+        document.getElementById('newEmail').value = '';
+        document.getElementById('newPassword').value = '';
+        document.getElementById('newNim').value = '';
+        document.getElementById('newNidn').value = '';
+        document.getElementById('newNip').value = '';
+        // Reload users
+        document.getElementById('loadUsersBtn').click();
+      }
+    });
+    
+    // Tabs
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+      document.getElementById(`${tabName}-tab`).classList.add('active');
+    }
+    
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    });
+    
+    // Init
+    log('info', 'Simulator ready. Login to start.');
+    log('info', `API Base: ${API_BASE}`);
+    log('info', `Socket.IO Path: ${SOCKET_PATH}`);
+  </script>
+</body>
+</html>
