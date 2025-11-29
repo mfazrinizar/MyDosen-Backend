@@ -1,0 +1,343 @@
+const { runQuery, getOne, getAll, generateUUID } = require('../config/db');
+const { checkGeofence } = require('../utils/geofence');
+
+// Import socket manager for online status (will be set from server.js)
+let getOnlineStatus = null;
+
+/**
+ * Set the online status getter function from socket manager
+ * Called during server initialization
+ */
+const setOnlineStatusGetter = (getter) => {
+  getOnlineStatus = getter;
+};
+
+/**
+ * Request tracking access to a Dosen
+ * Mahasiswa only endpoint
+ */
+const requestAccess = async (req, res) => {
+  try {
+    const studentId = req.user.id;
+    const { lecturer_id } = req.body;
+    
+    // Validate input
+    if (!lecturer_id) {
+      return res.status(400).json({ error: 'lecturer_id is required' });
+    }
+    
+    // Verify the requester is a mahasiswa
+    const studentProfile = await getOne(
+      'SELECT user_id FROM mahasiswa WHERE user_id = ?',
+      [studentId]
+    );
+    
+    if (!studentProfile) {
+      return res.status(403).json({ error: 'Only mahasiswa can request tracking access' });
+    }
+    
+    // Verify lecturer exists in dosen table
+    const lecturer = await getOne(
+      'SELECT d.user_id, u.name FROM dosen d JOIN users u ON d.user_id = u.id WHERE d.user_id = ?',
+      [lecturer_id]
+    );
+    
+    if (!lecturer) {
+      return res.status(404).json({ error: 'Dosen not found' });
+    }
+    
+    // Check if request already exists
+    const existingRequest = await getOne(
+      'SELECT id, status FROM tracking_permissions WHERE student_id = ? AND lecturer_id = ?',
+      [studentId, lecturer_id]
+    );
+    
+    if (existingRequest) {
+      return res.status(409).json({ 
+        error: 'Request already exists',
+        status: existingRequest.status,
+        permission_id: existingRequest.id
+      });
+    }
+    
+    // Create new pending request
+    const permissionId = generateUUID();
+    await runQuery(
+      'INSERT INTO tracking_permissions (id, student_id, lecturer_id, status) VALUES (?, ?, ?, ?)',
+      [permissionId, studentId, lecturer_id, 'pending']
+    );
+    
+    res.status(201).json({
+      message: 'Access request submitted successfully',
+      permission_id: permissionId,
+      lecturer_name: lecturer.name
+    });
+    
+  } catch (error) {
+    console.error('Request access error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Get pending tracking requests for a Dosen
+ * Dosen only endpoint
+ */
+const getPendingRequests = async (req, res) => {
+  try {
+    const lecturerId = req.user.id;
+    
+    // Verify the requester is a dosen
+    const dosenProfile = await getOne(
+      'SELECT user_id FROM dosen WHERE user_id = ?',
+      [lecturerId]
+    );
+    
+    if (!dosenProfile) {
+      return res.status(403).json({ error: 'Only dosen can view pending requests' });
+    }
+    
+    // Get pending requests with student information
+    const requests = await getAll(`
+      SELECT 
+        tp.id,
+        tp.student_id,
+        tp.status,
+        tp.created_at,
+        u.name as student_name,
+        u.email as student_email,
+        m.nim
+      FROM tracking_permissions tp
+      JOIN users u ON tp.student_id = u.id
+      JOIN mahasiswa m ON tp.student_id = m.user_id
+      WHERE tp.lecturer_id = ? AND tp.status = 'pending'
+      ORDER BY tp.created_at DESC
+    `, [lecturerId]);
+    
+    res.status(200).json({
+      count: requests.length,
+      requests: requests
+    });
+    
+  } catch (error) {
+    console.error('Get pending requests error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Handle tracking request (approve or reject)
+ * Dosen only endpoint
+ */
+const handleRequest = async (req, res) => {
+  try {
+    const lecturerId = req.user.id;
+    const { permission_id, action } = req.body;
+    
+    // Validate input
+    if (!permission_id || !action) {
+      return res.status(400).json({ error: 'permission_id and action are required' });
+    }
+    
+    // Validate action
+    const validActions = ['approved', 'rejected'];
+    if (!validActions.includes(action)) {
+      return res.status(400).json({ error: 'Invalid action. Must be: approved or rejected' });
+    }
+    
+    // Get the permission request
+    const permission = await getOne(
+      'SELECT * FROM tracking_permissions WHERE id = ?',
+      [permission_id]
+    );
+    
+    if (!permission) {
+      return res.status(404).json({ error: 'Permission request not found' });
+    }
+    
+    // Verify the lecturer owns this request
+    if (permission.lecturer_id !== lecturerId) {
+      return res.status(403).json({ error: 'Not authorized to handle this request' });
+    }
+    
+    // Update the permission status
+    await runQuery(
+      'UPDATE tracking_permissions SET status = ? WHERE id = ?',
+      [action, permission_id]
+    );
+    
+    res.status(200).json({
+      message: `Request ${action} successfully`,
+      permission_id: permission_id,
+      new_status: action
+    });
+    
+  } catch (error) {
+    console.error('Handle request error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Get list of Dosen that mahasiswa is allowed to track
+ * Includes location data with geofence masking and online status
+ * Mahasiswa only endpoint
+ */
+const getAllowedDosen = async (req, res) => {
+  try {
+    const studentId = req.user.id;
+    
+    // Verify the requester is a mahasiswa
+    const studentProfile = await getOne(
+      'SELECT user_id FROM mahasiswa WHERE user_id = ?',
+      [studentId]
+    );
+    
+    if (!studentProfile) {
+      return res.status(403).json({ error: 'Only mahasiswa can view allowed dosen' });
+    }
+    
+    // Get approved dosen with location data
+    const approvedDosen = await getAll(`
+      SELECT 
+        d.user_id,
+        u.name,
+        d.nidn,
+        l.latitude,
+        l.longitude,
+        l.position_name,
+        l.last_updated
+      FROM tracking_permissions tp
+      JOIN dosen d ON tp.lecturer_id = d.user_id
+      JOIN users u ON d.user_id = u.id
+      LEFT JOIN locations l ON d.user_id = l.user_id
+      WHERE tp.student_id = ? AND tp.status = 'approved'
+      ORDER BY u.name ASC
+    `, [studentId]);
+    
+    // Process each dosen to apply geofence masking and add online status
+    const processedDosen = await Promise.all(
+      approvedDosen.map(async (dosen) => {
+        let locationData = {
+          latitude: null,
+          longitude: null,
+          position_name: 'Lokasi tidak tersedia',
+          last_updated: null
+        };
+        
+        // Apply geofence masking if location exists
+        if (dosen.latitude !== null && dosen.longitude !== null) {
+          const geofenceResult = await checkGeofence(dosen.latitude, dosen.longitude);
+          locationData = {
+            latitude: geofenceResult.displayLat,
+            longitude: geofenceResult.displayLong,
+            position_name: geofenceResult.locationName,
+            last_updated: dosen.last_updated
+          };
+        }
+        
+        // Get online status from socket manager
+        const isOnline = getOnlineStatus ? getOnlineStatus(dosen.user_id) : false;
+        
+        return {
+          user_id: dosen.user_id,
+          name: dosen.name,
+          nidn: dosen.nidn,
+          ...locationData,
+          is_online: isOnline
+        };
+      })
+    );
+    
+    res.status(200).json({
+      count: processedDosen.length,
+      dosen: processedDosen
+    });
+    
+  } catch (error) {
+    console.error('Get allowed dosen error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Get all dosen (for mahasiswa to request access)
+ * Returns list without location data but includes online status
+ */
+const getAllDosen = async (req, res) => {
+  try {
+    const studentId = req.user.id;
+    
+    // Get all dosen with their request status for this student
+    const dosenList = await getAll(`
+      SELECT 
+        d.user_id,
+        u.name,
+        d.nidn,
+        tp.status as request_status,
+        tp.id as permission_id
+      FROM dosen d
+      JOIN users u ON d.user_id = u.id
+      LEFT JOIN tracking_permissions tp ON d.user_id = tp.lecturer_id AND tp.student_id = ?
+      ORDER BY u.name ASC
+    `, [studentId]);
+    
+    // Add online status from socket manager
+    const dosenWithStatus = dosenList.map(dosen => ({
+      ...dosen,
+      is_online: getOnlineStatus ? getOnlineStatus(dosen.user_id) : false
+    }));
+    
+    res.status(200).json({
+      count: dosenWithStatus.length,
+      dosen: dosenWithStatus
+    });
+    
+  } catch (error) {
+    console.error('Get all dosen error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Get my tracking requests (for mahasiswa)
+ */
+const getMyRequests = async (req, res) => {
+  try {
+    const studentId = req.user.id;
+    
+    const requests = await getAll(`
+      SELECT 
+        tp.id,
+        tp.lecturer_id,
+        tp.status,
+        tp.created_at,
+        u.name as lecturer_name,
+        d.nidn
+      FROM tracking_permissions tp
+      JOIN users u ON tp.lecturer_id = u.id
+      JOIN dosen d ON tp.lecturer_id = d.user_id
+      WHERE tp.student_id = ?
+      ORDER BY tp.created_at DESC
+    `, [studentId]);
+    
+    res.status(200).json({
+      count: requests.length,
+      requests: requests
+    });
+    
+  } catch (error) {
+    console.error('Get my requests error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+module.exports = {
+  requestAccess,
+  getPendingRequests,
+  handleRequest,
+  getAllowedDosen,
+  getAllDosen,
+  getMyRequests,
+  setOnlineStatusGetter
+};
