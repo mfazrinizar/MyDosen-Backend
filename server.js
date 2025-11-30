@@ -24,7 +24,7 @@ const trackingController = require('./controllers/trackingController');
 
 // Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3010;
 
 // Create HTTP server
 const server = http.createServer(app);

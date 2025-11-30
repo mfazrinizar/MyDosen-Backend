@@ -14,7 +14,7 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:3000/api/v1',
+        url: 'http://localhost:3010/api/v1',
         description: 'Development server'
       }
     ],
@@ -169,7 +169,7 @@ const options = {
       { name: 'Auth', description: 'Authentication endpoints' },
       { name: 'Admin', description: 'Admin management endpoints' },
       { name: 'Tracking', description: 'Location tracking and permission endpoints' },
-      { name: 'WebSocket', description: 'Socket.IO real-time events documentation. Connect to ws://localhost:3000 with path /api/v1/io' }
+      { name: 'WebSocket', description: 'Socket.IO real-time events documentation. Connect to ws://localhost:3010 with path /api/v1/io' }
     ],
     paths: {
       '/socket.io/connection': {
@@ -179,14 +179,14 @@ const options = {
           description: `
 ## Connection Details
 
-**Endpoint:** \`ws://localhost:3000\`  
+**Endpoint:** \`ws://localhost:3010\`  
 **Path:** \`/api/v1/io\`
 
 ### Authentication
 JWT token is required for connection. Pass it in the auth object:
 
 \`\`\`javascript
-const socket = io('http://localhost:3000', {
+const socket = io('http://localhost:3010', {
   path: '/api/v1/io',
   auth: {
     token: 'your_jwt_token_here'

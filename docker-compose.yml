@@ -6,10 +6,10 @@ services:
     container_name: mydosen-api
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${PORT:-3010}:${PORT:-3010}"
     environment:
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=${PORT:-3010}
       - DB_PATH=/app/db/database.sqlite
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
@@ -32,7 +32,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:3000/health",
+          "http://localhost:${PORT:-3010}/health",
         ]
       interval: 30s
       timeout: 10s

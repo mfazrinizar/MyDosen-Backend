@@ -346,7 +346,7 @@
       <p>Connect to the Socket.IO server using the following URL:</p>
       <div class="connection-url">
         <span class="label">SOCKET</span>
-        <span id="socket-url">ws://localhost:3000</span>
+        <span id="socket-url">ws://localhost:3010</span>
       </div>
       <p><strong>Path:</strong> <code>/api/v1/io</code></p>
       
@@ -357,7 +357,7 @@
         <div class="auth-method">
           <h4>Auth Object <span class="recommended">Recommended</span></h4>
           <div class="code-block">
-<span class="keyword">const</span> socket = <span class="function">io</span>(<span class="string">'http://localhost:3000'</span>, {
+<span class="keyword">const</span> socket = <span class="function">io</span>(<span class="string">'http://localhost:3010'</span>, {
   <span class="keyword">path</span>: <span class="string">'/api/v1/io'</span>,
   <span class="keyword">auth</span>: {
     <span class="keyword">token</span>: <span class="string">'your-jwt-token'</span>
@@ -369,7 +369,7 @@
         <div class="auth-method">
           <h4>Query Parameter</h4>
           <div class="code-block">
-<span class="keyword">const</span> socket = <span class="function">io</span>(<span class="string">'http://localhost:3000'</span>, {
+<span class="keyword">const</span> socket = <span class="function">io</span>(<span class="string">'http://localhost:3010'</span>, {
   <span class="keyword">path</span>: <span class="string">'/api/v1/io'</span>,
   <span class="keyword">query</span>: {
     <span class="keyword">token</span>: <span class="string">'your-jwt-token'</span>
@@ -604,7 +604,7 @@ socket.<span class="function">on</span>(<span class="string">'error'</span>, (da
       <h3>Complete Connection Example</h3>
       <div class="code-block">
 <span class="comment">// 1. Login to get JWT token</span>
-<span class="keyword">const</span> response = <span class="keyword">await</span> <span class="function">fetch</span>(<span class="string">'http://localhost:3000/api/v1/auth/login'</span>, {
+<span class="keyword">const</span> response = <span class="keyword">await</span> <span class="function">fetch</span>(<span class="string">'http://localhost:3010/api/v1/auth/login'</span>, {
   method: <span class="string">'POST'</span>,
   headers: { <span class="string">'Content-Type'</span>: <span class="string">'application/json'</span> },
   body: JSON.<span class="function">stringify</span>({
@@ -615,7 +615,7 @@ socket.<span class="function">on</span>(<span class="string">'error'</span>, (da
 <span class="keyword">const</span> { token } = <span class="keyword">await</span> response.<span class="function">json</span>();
 
 <span class="comment">// 2. Connect to Socket.IO</span>
-<span class="keyword">const</span> socket = <span class="function">io</span>(<span class="string">'http://localhost:3000'</span>, {
+<span class="keyword">const</span> socket = <span class="function">io</span>(<span class="string">'http://localhost:3010'</span>, {
   path: <span class="string">'/api/v1/io'</span>,
   auth: { token }
 });
