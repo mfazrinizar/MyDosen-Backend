@@ -1,0 +1,40 @@
+services:
+  mydosen-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mydosen-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_PATH=/app/db/database.sqlite
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      - DOC_USERNAME=${DOC_USERNAME}
+      - DOC_PASSWORD=${DOC_PASSWORD}
+      - SEED_ADMIN_EMAIL=${SEED_ADMIN_EMAIL:-admin@unsri.ac.id}
+      - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}
+      - SEED_DOSEN_EMAIL=${SEED_DOSEN_EMAIL:-dosen1@unsri.ac.id}
+      - SEED_DOSEN_PASSWORD=${SEED_DOSEN_PASSWORD}
+      - SEED_MAHASISWA_EMAIL=${SEED_MAHASISWA_EMAIL:-mahasiswa1@unsri.ac.id}
+      - SEED_MAHASISWA_PASSWORD=${SEED_MAHASISWA_PASSWORD}
+    volumes:
+      # Bind mount for persistent database - mirrors host db/database.sqlite
+      - ./db:/app/db
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
