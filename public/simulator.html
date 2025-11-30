@@ -84,10 +84,7 @@
           <div class="form-group">
             <label>Quick Login As:</label>
             <select id="quickLogin">
-              <option value="">-- Select User --</option>
-              <option value="admin@unsri.ac.id|admin123">Admin (admin@unsri.ac.id)</option>
-              <option value="dosen1@unsri.ac.id|dosen123">Dosen (dosen1@unsri.ac.id)</option>
-              <option value="mahasiswa1@unsri.ac.id|mahasiswa123">Mahasiswa (mahasiswa1@unsri.ac.id)</option>
+              <option value="">-- Loading users... --</option>
             </select>
           </div>
           
@@ -659,7 +656,38 @@
       tab.addEventListener('click', () => switchTab(tab.dataset.tab));
     });
     
+    // Load seed users from server
+    async function loadSeedUsers() {
+      try {
+        const res = await fetch('/api/v1/seed-users');
+        if (res.ok) {
+          const data = await res.json();
+          const select = document.getElementById('quickLogin');
+          select.innerHTML = '<option value="">-- Select User --</option>';
+          data.users.forEach(user => {
+            const opt = document.createElement('option');
+            opt.value = `${user.email}|${user.password}`;
+            opt.textContent = `${user.label} (${user.email})`;
+            select.appendChild(opt);
+          });
+          log('info', 'Seed users loaded from server');
+        } else {
+          log('error', 'Failed to load seed users - using defaults');
+          const select = document.getElementById('quickLogin');
+          select.innerHTML = `
+            <option value="">-- Select User --</option>
+            <option value="admin@unsri.ac.id|admin123">Admin (admin@unsri.ac.id)</option>
+            <option value="dosen1@unsri.ac.id|dosen123">Dosen (dosen1@unsri.ac.id)</option>
+            <option value="mahasiswa1@unsri.ac.id|mahasiswa123">Mahasiswa (mahasiswa1@unsri.ac.id)</option>
+          `;
+        }
+      } catch (err) {
+        log('error', `Error loading seed users: ${err.message}`);
+      }
+    }
+    
     // Init
+    loadSeedUsers();
     log('info', 'Simulator ready. Login to start.');
     log('info', `API Base: ${API_BASE}`);
     log('info', `Socket.IO Path: ${SOCKET_PATH}`);
