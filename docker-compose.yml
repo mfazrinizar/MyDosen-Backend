@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: mydosen-api
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "${PORT:-3010}:${PORT:-3010}"
     environment:
