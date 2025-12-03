@@ -224,11 +224,11 @@ const seedDatabase = async () => {
     if (existingGeofences.length === 0) {
       await runQuery(
         'INSERT INTO geofences (id, name, latitude, longitude, radius_km) VALUES (?, ?, ?, ?, ?)',
-        [generateUUID(), 'UNSRI Indralaya', -3.219, 104.64, 1.0]
+        [generateUUID(), 'UNSRI Indralaya', -3.219741, 104.651220, 2.5]
       );
       await runQuery(
         'INSERT INTO geofences (id, name, latitude, longitude, radius_km) VALUES (?, ?, ?, ?, ?)',
-        [generateUUID(), 'UNSRI Palembang', -2.980, 104.73, 1.0]
+        [generateUUID(), 'UNSRI Palembang', -2.985028, 104.732230, 1.5]
       );
       console.log('Geofences seeded successfully.');
     }

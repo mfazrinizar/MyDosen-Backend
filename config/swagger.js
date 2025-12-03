@@ -1,5 +1,7 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 
+const BASE_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3010}`;
+
 const options = {
   definition: {
     openapi: '3.0.0',
@@ -14,8 +16,8 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:3000/api/v1',
-        description: 'Development server'
+        url: `${BASE_URL}/api/v1`,
+        description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server'
       }
     ],
     components: {
@@ -169,7 +171,7 @@ const options = {
       { name: 'Auth', description: 'Authentication endpoints' },
       { name: 'Admin', description: 'Admin management endpoints' },
       { name: 'Tracking', description: 'Location tracking and permission endpoints' },
-      { name: 'WebSocket', description: 'Socket.IO real-time events documentation. Connect to ws://localhost:3000 with path /api/v1/io' }
+      { name: 'WebSocket', description: `Socket.IO real-time events documentation. Connect to ${BASE_URL.replace('http', 'ws').replace('https', 'wss')} with path /api/v1/io` }
     ],
     paths: {
       '/socket.io/connection': {
@@ -179,14 +181,14 @@ const options = {
           description: `
 ## Connection Details
 
-**Endpoint:** \`ws://localhost:3000\`  
+**Endpoint:** \`${BASE_URL.replace('http', 'ws').replace('https', 'wss')}\`  
 **Path:** \`/api/v1/io\`
 
 ### Authentication
 JWT token is required for connection. Pass it in the auth object:
 
 \`\`\`javascript
-const socket = io('http://localhost:3000', {
+const socket = io('${BASE_URL}', {
   path: '/api/v1/io',
   auth: {
     token: 'your_jwt_token_here'

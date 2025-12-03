@@ -50,10 +50,10 @@ npm run dev
 
 ### Server URLs
 
-- **API Server:** http://localhost:3000
-- **API Documentation:** http://localhost:3000/api-docs (Swagger UI)
-- **Socket.IO Docs:** http://localhost:3000/socket-docs (JSON)
-- **Health Check:** http://localhost:3000/health
+- **API Server:** http://localhost:3010
+- **API Documentation:** http://localhost:3010/api-docs (Swagger UI)
+- **Socket.IO Docs:** http://localhost:3010/socket-docs (JSON)
+- **Health Check:** http://localhost:3010/health
 
 ### API Docs Credentials
 
@@ -99,7 +99,7 @@ The system comes with seeded users for testing:
 
 ## Socket.IO Events
 
-> **Full documentation available at:** http://localhost:3000/socket-docs
+> **Full documentation available at:** http://localhost:3010/socket-docs
 
 ### Client → Server
 
@@ -120,7 +120,7 @@ The system comes with seeded users for testing:
 Connect with JWT token:
 
 ```javascript
-const socket = io("http://localhost:3000", {
+const socket = io("http://localhost:3010", {
   auth: { token: "your-jwt-token" },
 });
 ```

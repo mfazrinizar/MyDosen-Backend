@@ -24,7 +24,7 @@ const trackingController = require('./controllers/trackingController');
 
 // Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3010;
 
 // Create HTTP server
 const server = http.createServer(app);
@@ -71,6 +71,17 @@ app.get('/socket-docs', docAuth, (req, res) => {
 // Simulator - Protected with Basic Auth
 app.get('/simulator', docAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'simulator.html'));
+});
+
+// Seed users endpoint for simulator (protected)
+app.get('/api/v1/seed-users', docAuth, (req, res) => {
+  res.json({
+    users: [
+      { label: 'Admin', email: process.env.SEED_ADMIN_EMAIL || 'admin@unsri.ac.id', password: process.env.SEED_ADMIN_PASSWORD || 'admin123' },
+      { label: 'Dosen', email: process.env.SEED_DOSEN_EMAIL || 'dosen1@unsri.ac.id', password: process.env.SEED_DOSEN_PASSWORD || 'dosen123' },
+      { label: 'Mahasiswa', email: process.env.SEED_MAHASISWA_EMAIL || 'mahasiswa1@unsri.ac.id', password: process.env.SEED_MAHASISWA_PASSWORD || 'mahasiswa123' }
+    ]
+  });
 });
 
 // API Routes - Version 1

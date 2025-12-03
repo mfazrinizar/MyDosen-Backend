@@ -258,8 +258,38 @@ const handleJoinDosenRoom = async (io, socket, user, data) => {
     const roomName = `room:dosen_${dosenId}`;
     socket.join(roomName);
     
+    // Get dosen info
+    const dosen = await getOne('SELECT name FROM users WHERE id = ?', [dosenId]);
+    const dosenName = dosen?.name || 'Unknown';
+    
+    // Send current dosen status ONLY to this mahasiswa (not broadcast)
+    const isOnline = isDosenOnline(dosenId);
+    socket.emit('dosen_status', {
+      dosen_id: dosenId,
+      name: dosenName,
+      is_online: isOnline
+    });
+    
+    // If dosen is online, also send their last known location to this mahasiswa
+    if (isOnline) {
+      const location = await getOne(
+        'SELECT latitude, longitude, position_name, last_updated FROM locations WHERE user_id = ?',
+        [dosenId]
+      );
+      if (location) {
+        socket.emit('dosen_moved', {
+          dosen_id: dosenId,
+          name: dosenName,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          position_name: location.position_name,
+          last_updated: location.last_updated
+        });
+      }
+    }
+    
     socket.emit('room_joined', { 
-      dosenId: dosenId, 
+      dosen_id: dosenId, 
       room: roomName,
       message: 'Successfully joined tracking room' 
     });
