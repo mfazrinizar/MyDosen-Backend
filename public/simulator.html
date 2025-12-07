@@ -162,6 +162,12 @@
           <h2>📋 Pending Tracking Requests</h2>
           <button class="btn btn-primary" id="loadPendingBtn">Load Pending Requests</button>
           <div id="pendingList" style="margin-top: 15px; max-height: 200px; overflow-y: auto;"></div>
+          
+          <hr style="border-color: #0f3460; margin: 20px 0;">
+          
+          <h2>📊 Location History (Weekly)</h2>
+          <button class="btn btn-primary" id="loadHistoryBtn">Load My History</button>
+          <div id="historyList" style="margin-top: 15px; max-height: 300px; overflow-y: auto;"></div>
 
           <script>
             // Called when user edits the latitude/longitude inputs or after quick-loc selection.
@@ -206,6 +212,16 @@
           <h2 style="margin-top: 20px;">📋 My Tracking Permissions</h2>
           <button class="btn btn-primary" id="loadPermissionsBtn">Check My Permissions</button>
           <div id="permissionsList" style="margin-top: 10px;"></div>
+          
+          <h2 style="margin-top: 20px;">📊 Dosen Location History</h2>
+          <div class="form-group">
+            <label>Select Dosen:</label>
+            <select id="mahasiswaHistoryDosenSelect">
+              <option value="">-- Select Dosen --</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="loadMahasiswaHistoryBtn">View History</button>
+          <div id="mahasiswaHistoryList" style="margin-top: 15px; max-height: 300px; overflow-y: auto;"></div>
           
           <div class="location-display" id="trackedLocation" style="display:none;">
             <h3>📡 Tracked Dosen Location</h3>
@@ -505,6 +521,54 @@
       });
     });
     
+    // Dosen - Load location history (GET /tracking/history)
+    document.getElementById('loadHistoryBtn').addEventListener('click', async () => {
+      const res = await apiCall('GET', '/tracking/history');
+      if (res.error) return;
+      
+      const list = document.getElementById('historyList');
+      list.innerHTML = '';
+      
+      if (!res.history || res.history.length === 0) {
+        list.innerHTML = '<p style="color:#888;font-size:12px;">No location history available.</p>';
+        return;
+      }
+      
+      res.history.forEach(dayData => {
+        const item = document.createElement('div');
+        item.style.cssText = 'padding:10px;background:#0f3460;border-radius:6px;margin-bottom:8px;';
+        
+        const hasData = dayData.logs && dayData.logs.length > 0;
+        const bgColor = hasData ? '#1a4a7a' : '#0f3460';
+        const isWeekday = dayData.day_of_week >= 1 && dayData.day_of_week <= 5;
+        const dayLabel = isWeekday ? '📅' : '📴';
+        
+        item.style.background = bgColor;
+        
+        let logsHtml = '';
+        if (hasData) {
+          logsHtml = dayData.logs.map((log, index) => `
+            <div style="margin-top:${index > 0 ? '8px' : '6px'};padding-top:${index > 0 ? '8px' : '0'};border-top:${index > 0 ? '1px solid #2a5a8a' : 'none'};">  
+              <div style="font-size:11px;color:#00d9ff;">📍 ${log.location_name}</div>
+              <div style="font-size:10px;color:#888;margin-top:4px;">Lat: ${log.latitude.toFixed(4)}, Lng: ${log.longitude.toFixed(4)}</div>
+              <div style="font-size:10px;color:#666;margin-top:2px;">🕒 ${new Date(log.logged_at).toLocaleString('id-ID')}</div>
+            </div>
+          `).join('');
+        } else {
+          logsHtml = '<div style="font-size:11px;color:#666;margin-top:4px;">Tidak ada lokasi tercatat</div>';
+        }
+        
+        item.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong style="color:#fff;">${dayLabel} ${dayData.day_name}</strong>
+            ${hasData ? `<span style="color:#00c853;font-size:10px;">✓ ${dayData.logs.length} log(s)</span>` : '<span style="color:#666;font-size:10px;">No data</span>'}
+          </div>
+          ${logsHtml}
+        `;
+        list.appendChild(item);
+      });
+    });
+    
     // Dosen - Handle request (POST /tracking/handle)
     async function handleRequest(permissionId, action) {
       const res = await apiCall('POST', '/tracking/handle', { permission_id: permissionId, action: action });
@@ -521,6 +585,10 @@
       
       const list = document.getElementById('dosenList');
       list.innerHTML = '';
+      
+      // Also populate history dropdown with approved dosen
+      const historySelect = document.getElementById('mahasiswaHistoryDosenSelect');
+      historySelect.innerHTML = '<option value="">-- Select Dosen --</option>';
       
       const dosenArray = res.dosen || res;
       dosenArray.forEach(dosen => {
@@ -540,6 +608,14 @@
           </div>
         `;
         list.appendChild(item);
+        
+        // Add approved dosen to history dropdown
+        if (dosen.request_status === 'approved') {
+          const opt = document.createElement('option');
+          opt.value = dosenId;
+          opt.textContent = dosen.name;
+          historySelect.appendChild(opt);
+        }
       });
     });
     
@@ -608,6 +684,67 @@
           <div style="color:#888;margin-top:4px;">Created: ${new Date(req.created_at).toLocaleString()}</div>
         `;
         permList.appendChild(item);
+      });
+    });
+    
+    // Mahasiswa - Load dosen location history (GET /tracking/history?dosen_id=...)
+    document.getElementById('loadMahasiswaHistoryBtn').addEventListener('click', async () => {
+      const dosenId = document.getElementById('mahasiswaHistoryDosenSelect').value;
+      
+      if (!dosenId) {
+        log('error', 'Please select a dosen first');
+        return;
+      }
+      
+      const res = await apiCall('GET', `/tracking/history?dosen_id=${dosenId}`);
+      if (res.error) return;
+      
+      const list = document.getElementById('mahasiswaHistoryList');
+      list.innerHTML = '';
+      
+      if (!res.history || res.history.length === 0) {
+        list.innerHTML = '<p style="color:#888;font-size:12px;">No location history available.</p>';
+        return;
+      }
+      
+      // Add header with dosen name
+      const header = document.createElement('div');
+      header.style.cssText = 'padding:10px;background:#00d9ff;color:#1a1a2e;border-radius:6px;margin-bottom:10px;font-weight:600;';
+      header.textContent = `📊 History: ${res.dosen_name}`;
+      list.appendChild(header);
+      
+      res.history.forEach(dayData => {
+        const item = document.createElement('div');
+        item.style.cssText = 'padding:10px;background:#0f3460;border-radius:6px;margin-bottom:8px;';
+        
+        const hasData = dayData.logs && dayData.logs.length > 0;
+        const bgColor = hasData ? '#1a4a7a' : '#0f3460';
+        const isWeekday = dayData.day_of_week >= 1 && dayData.day_of_week <= 5;
+        const dayLabel = isWeekday ? '📅' : '📴';
+        
+        item.style.background = bgColor;
+        
+        let logsHtml = '';
+        if (hasData) {
+          logsHtml = dayData.logs.map((log, index) => `
+            <div style="margin-top:${index > 0 ? '8px' : '6px'};padding-top:${index > 0 ? '8px' : '0'};border-top:${index > 0 ? '1px solid #2a5a8a' : 'none'};">  
+              <div style="font-size:11px;color:#00d9ff;">📍 ${log.location_name}</div>
+              <div style="font-size:10px;color:#888;margin-top:4px;">Lat: ${log.latitude.toFixed(4)}, Lng: ${log.longitude.toFixed(4)}</div>
+              <div style="font-size:10px;color:#666;margin-top:2px;">🕒 ${new Date(log.logged_at).toLocaleString('id-ID')}</div>
+            </div>
+          `).join('');
+        } else {
+          logsHtml = '<div style="font-size:11px;color:#666;margin-top:4px;">Tidak ada lokasi tercatat</div>';
+        }
+        
+        item.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong style="color:#fff;">${dayLabel} ${dayData.day_name}</strong>
+            ${hasData ? `<span style="color:#00c853;font-size:10px;">✓ ${dayData.logs.length} log(s)</span>` : '<span style="color:#666;font-size:10px;">No data</span>'}
+          </div>
+          ${logsHtml}
+        `;
+        list.appendChild(item);
       });
     });
     
