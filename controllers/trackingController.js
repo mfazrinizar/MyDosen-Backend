@@ -332,6 +332,114 @@ const getMyRequests = async (req, res) => {
   }
 };
 
+/**
+ * Get location history for dosen (last 7 days, by day of week)
+ * Accessible by:
+ * - Dosen: Get their own history
+ * - Mahasiswa: Get history of approved dosen (requires dosen_id query param)
+ */
+const getLocationHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    let dosenId;
+    let dosenName;
+
+    if (userRole === 'dosen') {
+      // Dosen getting their own history
+      dosenId = userId;
+      dosenName = req.user.name;
+    } else if (userRole === 'mahasiswa') {
+      // Mahasiswa getting a dosen's history
+      const requestedDosenId = req.query.dosen_id;
+      
+      if (!requestedDosenId) {
+        return res.status(400).json({ error: 'dosen_id query parameter is required for mahasiswa' });
+      }
+
+      // Verify mahasiswa has approved permission to track this dosen
+      const permission = await getOne(
+        `SELECT id FROM tracking_permissions 
+         WHERE student_id = ? AND lecturer_id = ? AND status = 'approved'`,
+        [userId, requestedDosenId]
+      );
+
+      if (!permission) {
+        return res.status(403).json({ 
+          error: 'Access denied. You do not have permission to view this dosen\'s history.' 
+        });
+      }
+
+      // Get dosen info
+      const dosen = await getOne(
+        'SELECT u.name FROM users u JOIN dosen d ON u.id = d.user_id WHERE d.user_id = ?',
+        [requestedDosenId]
+      );
+
+      if (!dosen) {
+        return res.status(404).json({ error: 'Dosen not found' });
+      }
+
+      dosenId = requestedDosenId;
+      dosenName = dosen.name;
+    } else {
+      return res.status(403).json({ error: 'Only dosen and mahasiswa can view location history' });
+    }
+
+    // Get history logs for all days
+    const history = await getAll(`
+      SELECT 
+        day_of_week,
+        location_name,
+        latitude,
+        longitude,
+        logged_at
+      FROM location_history
+      WHERE dosen_id = ?
+      ORDER BY day_of_week ASC, logged_at DESC
+    `, [dosenId]);
+
+    // Group by day of week, keeping ALL logs for each day
+    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const historyByDay = {};
+
+    // Initialize all days
+    for (let day = 0; day < 7; day++) {
+      historyByDay[day] = [];
+    }
+
+    // Group logs by day of week
+    history.forEach(log => {
+      historyByDay[log.day_of_week].push({
+        location_name: log.location_name,
+        latitude: log.latitude,
+        longitude: log.longitude,
+        logged_at: log.logged_at
+      });
+    });
+
+    // Format response with all 7 days
+    const formattedHistory = [];
+    for (let day = 0; day < 7; day++) {
+      formattedHistory.push({
+        day_of_week: day,
+        day_name: dayNames[day],
+        logs: historyByDay[day] // Array of all logs for this day
+      });
+    }
+
+    res.status(200).json({
+      dosen_id: dosenId,
+      dosen_name: dosenName,
+      history: formattedHistory
+    });
+
+  } catch (error) {
+    console.error('Get location history error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   requestAccess,
   getPendingRequests,
@@ -339,5 +447,6 @@ module.exports = {
   getAllowedDosen,
   getAllDosen,
   getMyRequests,
+  getLocationHistory,
   setOnlineStatusGetter
 };
