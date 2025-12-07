@@ -12,6 +12,9 @@ const lastSaveTimestamps = new Map();
 // Throttle interval for database writes (60 seconds)
 const LOCATION_SAVE_THROTTLE_MS = 60000;
 
+// Throttle interval for location logging (3600000 ms = 1 hour)
+const LOCATION_LOG_THROTTLE_MS = 3600000;
+
 /**
  * Get online status for a dosen
  * @param {number} dosenId - The dosen user ID
@@ -180,6 +183,9 @@ const handleLocationUpdate = async (io, socket, user, data) => {
       console.log(`Location saved for dosen ${user.id}`);
     }
 
+    // Step D: Log to history (on-campus only)
+    await logLocationToHistory(user.id, geofenceResult);
+
     // Acknowledge the update
     socket.emit('location_updated', { 
       success: true, 
@@ -193,7 +199,7 @@ const handleLocationUpdate = async (io, socket, user, data) => {
 };
 
 /**
- * Save location to database
+ * Save location to database with throttling (60 seconds)
  */
 const saveLocation = async (userId, geofenceResult) => {
   try {
@@ -218,6 +224,73 @@ const saveLocation = async (userId, geofenceResult) => {
     }
   } catch (error) {
     console.error('Error saving location:', error.message);
+  }
+};
+
+/**
+ * Log location to history (logs if 1 hour passed OR location changed)
+ */
+const logLocationToHistory = async (userId, geofenceResult) => {
+  try {
+    // Only log if on campus (skip "Di Luar Kampus")
+    if (!geofenceResult.isInside) {
+      console.log(`Skipping history log for dosen ${userId} - outside campus`);
+      return;
+    }
+
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+    const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    // Get the most recent log for this dosen on this day of week today
+    const lastLog = await getOne(
+      `SELECT location_name, logged_at FROM location_history 
+       WHERE dosen_id = ? AND day_of_week = ? AND logged_date = ?
+       ORDER BY logged_at DESC LIMIT 1`,
+      [userId, dayOfWeek, today]
+    );
+
+    let shouldLog = false;
+    let reason = '';
+
+    if (!lastLog) {
+      // No log for today yet
+      shouldLog = true;
+      reason = 'first log for today';
+    } else {
+      const lastLogTime = new Date(lastLog.logged_at + 'Z').getTime(); 
+      const timeSinceLastLog = now.getTime() - lastLogTime;
+      
+      // Check if location name changed
+      const locationChanged = lastLog.location_name !== geofenceResult.locationName;
+      
+      // Check if 1 hour has passed
+      const hourPassed = timeSinceLastLog >= LOCATION_LOG_THROTTLE_MS;
+
+      if (locationChanged) {
+        shouldLog = true;
+        reason = `location changed from "${lastLog.location_name}" to "${geofenceResult.locationName}"`;
+      } else if (hourPassed) {
+        shouldLog = true;
+        reason = `1 hour passed (${Math.round(timeSinceLastLog / 60000)} min)`;
+      } else {
+        console.log(`Skipping history log for dosen ${userId} - same location and only ${Math.round(timeSinceLastLog / 60000)} min since last log`);
+      }
+    }
+
+    if (shouldLog) {
+      // Always insert new history log
+      const { v4: uuidv4 } = require('uuid');
+      await runQuery(
+        `INSERT INTO location_history (id, dosen_id, day_of_week, location_name, latitude, longitude, logged_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [uuidv4(), userId, dayOfWeek, geofenceResult.locationName, geofenceResult.displayLat, geofenceResult.displayLong, today]
+      );
+      console.log(`Logged location for dosen ${userId} on day ${dayOfWeek} (${today}) - ${reason}`);
+    }
+
+  } catch (error) {
+    console.error('Error logging location to history:', error.message);
   }
 };
 
