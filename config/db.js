@@ -133,6 +133,22 @@ const initializeDatabase = async () => {
             longitude REAL NOT NULL,
             radius_km REAL DEFAULT 1.0
           )
+        `);
+
+        // Create location history table - logs dosen location per day
+        // Multiple logs per day allowed (when 1 hour passes OR location changes)
+        db.run(`
+          CREATE TABLE IF NOT EXISTS location_history (
+            id TEXT PRIMARY KEY,
+            dosen_id TEXT NOT NULL,
+            day_of_week INTEGER NOT NULL,
+            location_name TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            logged_date TEXT NOT NULL,
+            logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (dosen_id) REFERENCES dosen(user_id) ON DELETE CASCADE
+          )
         `, async (err) => {
           if (err) {
             reject(err);

@@ -96,6 +96,36 @@ The system comes with seeded users for testing:
 
 - `GET /api/tracking/pending` - View pending tracking requests
 - `POST /api/tracking/handle` - Approve/reject a request
+- `GET /api/tracking/history` - Get own location history (per day of week)
+
+### Tracking - Both Roles
+
+- `GET /api/tracking/history` - Get location history
+  - **Dosen**: Returns own history
+  - **Mahasiswa**: Requires `dosen_id` query param and approved permission
+
+## Location History Feature
+
+The system logs dosen locations throughout the day with intelligent tracking:
+
+### Logging Rules
+
+- ✅ **Only on-campus locations** are logged (UNSRI Indralaya or UNSRI Palembang)
+- ✅ **Multiple logs per day** are created when:
+  - 1 hour has passed since the last log, OR
+  - The dosen moved to a different campus location
+- ✅ **Always appends** new records (never updates existing logs)
+- ✅ **Per day-of-week tracking** (0=Sunday, 1=Monday, ..., 6=Saturday)
+
+### Throttling
+
+- **Location saves to DB:** 60 seconds minimum interval
+- **History logs:** 1 hour minimum interval (unless location changed)
+
+### Access Control
+
+- **Dosen:** Can view their own complete history
+- **Mahasiswa:** Can only view history of dosen they have approved tracking permission for
 
 ## Socket.IO Events
 

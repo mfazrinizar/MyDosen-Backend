@@ -559,4 +559,83 @@ router.get('/tracking/pending', verifyToken, requireDosen, trackingController.ge
  */
 router.post('/tracking/handle', verifyToken, requireDosen, trackingController.handleRequest);
 
+// ==================== LOCATION HISTORY ROUTES ====================
+
+/**
+ * @swagger
+ * /tracking/history:
+ *   get:
+ *     tags: [Tracking]
+ *     summary: Get location history for dosen
+ *     description: |
+ *       Get location history for each day of week (Mon-Sun).
+ *       Multiple logs per day are stored when:
+ *       - 1 hour has passed since the last log
+ *       - The dosen moved to a different on-campus location
+ *       
+ *       Returns ALL logs for each day of week, grouped by day.
+ *       - **Dosen**: Get their own history
+ *       - **Mahasiswa**: Get history of a specific dosen (requires query param `dosen_id` and approved permission)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dosen_id
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Dosen ID (required for mahasiswa, ignored for dosen)
+ *     responses:
+ *       200:
+ *         description: Location history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 dosen_id:
+ *                   type: string
+ *                   format: uuid
+ *                 dosen_name:
+ *                   type: string
+ *                 history:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       day_of_week:
+ *                         type: integer
+ *                         description: 0=Sunday, 1=Monday, ..., 6=Saturday
+ *                       day_name:
+ *                         type: string
+ *                       logs:
+ *                         type: array
+ *                         description: All location logs for this day (newest first)
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             location_name:
+ *                               type: string
+ *                             latitude:
+ *                               type: number
+ *                             longitude:
+ *                               type: number
+ *                             logged_at:
+ *                               type: string
+ *                               format: date-time
+ *       400:
+ *         description: Missing dosen_id for mahasiswa
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: No permission to view this dosen's history
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get('/tracking/history', verifyToken, trackingController.getLocationHistory);
+
 module.exports = router;
