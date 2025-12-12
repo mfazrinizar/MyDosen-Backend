@@ -6,6 +6,9 @@ const { checkGeofence } = require('../utils/geofence');
 // In-memory storage for online dosen status (dosenId -> socket count)
 const onlineDosenMap = new Map();
 
+// Generic in-memory storage for online users (userId -> socket count)
+const onlineUsersMap = new Map();
+
 // In-memory storage for last location save timestamps (userId -> timestamp)
 const lastSaveTimestamps = new Map();
 
@@ -22,6 +25,16 @@ const LOCATION_LOG_THROTTLE_MS = 3600000;
  */
 const isDosenOnline = (dosenId) => {
   const socketCount = onlineDosenMap.get(dosenId);
+  return socketCount !== undefined && socketCount > 0;
+};
+
+/**
+ * Get online status for any user (dosen or mahasiswa)
+ * @param {number} userId - The user ID
+ * @returns {boolean}
+ */
+const isUserOnline = (userId) => {
+  const socketCount = onlineUsersMap.get(userId);
   return socketCount !== undefined && socketCount > 0;
 };
 
@@ -111,6 +124,9 @@ const handleDosenConnection = (io, socket, user) => {
   // Update online status
   const currentCount = onlineDosenMap.get(user.id) || 0;
   onlineDosenMap.set(user.id, currentCount + 1);
+  // Also update generic user online map
+  const userCount = onlineUsersMap.get(user.id) || 0;
+  onlineUsersMap.set(user.id, userCount + 1);
   
   // Broadcast online status if this is the first connection
   if (currentCount === 0) {
@@ -129,6 +145,9 @@ const handleDosenConnection = (io, socket, user) => {
 const handleMahasiswaConnection = async (io, socket, user) => {
   // Mahasiswa can join rooms of approved dosen
   console.log(`Mahasiswa ${user.name} connected`);
+  // Track mahasiswa online count in generic map
+  const userCount = onlineUsersMap.get(user.id) || 0;
+  onlineUsersMap.set(user.id, userCount + 1);
 };
 
 /**
@@ -336,7 +355,7 @@ const handleJoinDosenRoom = async (io, socket, user, data) => {
     const dosenName = dosen?.name || 'Unknown';
     
     // Send current dosen status ONLY to this mahasiswa (not broadcast)
-    const isOnline = isDosenOnline(dosenId);
+    const isOnline = isUserOnline(dosenId);
     socket.emit('dosen_status', {
       dosen_id: dosenId,
       name: dosenName,
@@ -400,9 +419,19 @@ const handleDisconnect = (io, socket, user) => {
       onlineDosenMap.set(user.id, newCount);
     }
   }
+
+  // Update generic user online map for all users (dosen or mahasiswa)
+  const currentUserCount = onlineUsersMap.get(user.id) || 0;
+  const newUserCount = Math.max(0, currentUserCount - 1);
+  if (newUserCount === 0) {
+    onlineUsersMap.delete(user.id);
+  } else {
+    onlineUsersMap.set(user.id, newUserCount);
+  }
 };
 
 module.exports = {
   initSockets,
-  isDosenOnline
+  isDosenOnline,
+  isUserOnline
 };

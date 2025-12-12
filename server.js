@@ -17,7 +17,7 @@ const docAuth = require('./middleware/docAuth');
 const apiRoutes = require('./routes/apiRoutes');
 
 // Socket Manager
-const { initSockets, isDosenOnline } = require('./sockets/socketManager');
+const { initSockets, isUserOnline } = require('./sockets/socketManager');
 
 // Tracking Controller - set online status getter
 const trackingController = require('./controllers/trackingController');
@@ -132,8 +132,8 @@ const startServer = async () => {
     await initializeDatabase();
     console.log('Database initialized successfully.');
     
-    // Set online status getter for tracking controller
-    trackingController.setOnlineStatusGetter(isDosenOnline);
+    // Set online status getter for tracking controller (generic user checker)
+    trackingController.setOnlineStatusGetter(isUserOnline);
     
     // Initialize Socket.IO
     initSockets(io);
