@@ -24,7 +24,8 @@ const LOCATION_LOG_THROTTLE_MS = 3600000;
  * @returns {boolean} Whether the dosen is online
  */
 const isDosenOnline = (dosenId) => {
-  const sockets = onlineDosenMap.get(dosenId);
+  const key = String(dosenId);
+  const sockets = onlineDosenMap.get(key);
   return sockets !== undefined && sockets.size > 0;
 };
 
@@ -34,7 +35,8 @@ const isDosenOnline = (dosenId) => {
  * @returns {boolean}
  */
 const isUserOnline = (userId) => {
-  const sockets = onlineUsersMap.get(userId);
+  const key = String(userId);
+  const sockets = onlineUsersMap.get(key);
   return sockets !== undefined && sockets.size > 0;
 };
 
@@ -122,14 +124,16 @@ const handleDosenConnection = (io, socket, user) => {
   socket.join(dosenRoom);
   
   // Update onlineDosenMap with this socket id
-  const dosenSockets = onlineDosenMap.get(user.id) || new Set();
+  const dosenKey = String(user.id);
+  const dosenSockets = onlineDosenMap.get(dosenKey) || new Set();
   dosenSockets.add(socket.id);
-  onlineDosenMap.set(user.id, dosenSockets);
+  onlineDosenMap.set(dosenKey, dosenSockets);
 
   // Also update generic user online map with this socket id
-  const userSockets = onlineUsersMap.get(user.id) || new Set();
+  const userKey = String(user.id);
+  const userSockets = onlineUsersMap.get(userKey) || new Set();
   userSockets.add(socket.id);
-  onlineUsersMap.set(user.id, userSockets);
+  onlineUsersMap.set(userKey, userSockets);
 
   // Broadcast online status if this is the first connection
   if (dosenSockets.size === 1) {
@@ -149,9 +153,10 @@ const handleMahasiswaConnection = async (io, socket, user) => {
   // Mahasiswa can join rooms of approved dosen
   console.log(`Mahasiswa ${user.name} connected`);
   // Track mahasiswa socket id in generic map
-  const userSockets = onlineUsersMap.get(user.id) || new Set();
+  const userKey = String(user.id);
+  const userSockets = onlineUsersMap.get(userKey) || new Set();
   userSockets.add(socket.id);
-  onlineUsersMap.set(user.id, userSockets);
+  onlineUsersMap.set(userKey, userSockets);
 };
 
 /**
@@ -405,23 +410,25 @@ const handleDisconnect = (io, socket, user) => {
   console.log(`User disconnected: ${user.name} (ID: ${user.id})`);
   
   // Remove this socket id from the generic user map
-  const userSockets = onlineUsersMap.get(user.id);
+  const userKey = String(user.id);
+  const userSockets = onlineUsersMap.get(userKey);
   if (userSockets) {
     userSockets.delete(socket.id);
     if (userSockets.size === 0) {
-      onlineUsersMap.delete(user.id);
+      onlineUsersMap.delete(userKey);
     } else {
-      onlineUsersMap.set(user.id, userSockets);
+      onlineUsersMap.set(userKey, userSockets);
     }
   }
 
   // If user is dosen, also remove from dosen-specific map and broadcast offline when empty
   if (user.role === 'dosen') {
-    const dosenSockets = onlineDosenMap.get(user.id);
+    const dosenKey = String(user.id);
+    const dosenSockets = onlineDosenMap.get(dosenKey);
     if (dosenSockets) {
       dosenSockets.delete(socket.id);
       if (dosenSockets.size === 0) {
-        onlineDosenMap.delete(user.id);
+        onlineDosenMap.delete(dosenKey);
         // Broadcast offline status
         io.emit('dosen_status', {
           dosen_id: user.id,
@@ -430,7 +437,7 @@ const handleDisconnect = (io, socket, user) => {
         });
         console.log(`Dosen ${user.name} is now offline`);
       } else {
-        onlineDosenMap.set(user.id, dosenSockets);
+        onlineDosenMap.set(dosenKey, dosenSockets);
       }
     }
   }
