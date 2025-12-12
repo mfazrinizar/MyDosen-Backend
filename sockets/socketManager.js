@@ -78,6 +78,25 @@ const initSockets = (io) => {
     const user = socket.user;
     console.log(`User connected: ${user.name} (ID: ${user.id}, Role: ${user.role})`);
 
+    // Set up inactivity timeout only for dosen (30 seconds)
+    if (user.role === 'dosen') {
+      socket.lastActivity = Date.now();
+      socket.inactivityTimeout = setTimeout(() => {
+        console.log(`Disconnecting socket ${socket.id} for user ${user.name} due to inactivity`);
+        socket.disconnect(true);
+      }, 30000);
+
+      // Reset inactivity timeout on any incoming event
+      socket.onAny(() => {
+        socket.lastActivity = Date.now();
+        clearTimeout(socket.inactivityTimeout);
+        socket.inactivityTimeout = setTimeout(() => {
+          console.log(`Disconnecting socket ${socket.id} for user ${user.name} due to inactivity`);
+          socket.disconnect(true);
+        }, 30000);
+      });
+    }
+
     // Handle Dosen connection
     if (user.role === 'dosen') {
       handleDosenConnection(io, socket, user);
@@ -408,6 +427,11 @@ const handleJoinDosenRoom = async (io, socket, user, data) => {
  */
 const handleDisconnect = (io, socket, user) => {
   console.log(`User disconnected: ${user.name} (ID: ${user.id})`);
+  
+  // Clear inactivity timeout
+  if (socket.inactivityTimeout) {
+    clearTimeout(socket.inactivityTimeout);
+  }
   
   // Remove this socket id from the generic user map
   const userKey = String(user.id);
