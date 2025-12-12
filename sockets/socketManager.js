@@ -3,10 +3,10 @@ const { JWT_SECRET } = require('../middleware/authMiddleware');
 const { getOne, runQuery } = require('../config/db');
 const { checkGeofence } = require('../utils/geofence');
 
-// In-memory storage for online dosen status (dosenId -> socket count)
+// In-memory storage for online dosen socket ids (dosenId -> Set(socketId))
 const onlineDosenMap = new Map();
 
-// Generic in-memory storage for online users (userId -> socket count)
+// Generic in-memory storage for online users socket ids (userId -> Set(socketId))
 const onlineUsersMap = new Map();
 
 // In-memory storage for last location save timestamps (userId -> timestamp)
@@ -24,8 +24,8 @@ const LOCATION_LOG_THROTTLE_MS = 3600000;
  * @returns {boolean} Whether the dosen is online
  */
 const isDosenOnline = (dosenId) => {
-  const socketCount = onlineDosenMap.get(dosenId);
-  return socketCount !== undefined && socketCount > 0;
+  const sockets = onlineDosenMap.get(dosenId);
+  return sockets !== undefined && sockets.size > 0;
 };
 
 /**
@@ -34,8 +34,8 @@ const isDosenOnline = (dosenId) => {
  * @returns {boolean}
  */
 const isUserOnline = (userId) => {
-  const socketCount = onlineUsersMap.get(userId);
-  return socketCount !== undefined && socketCount > 0;
+  const sockets = onlineUsersMap.get(userId);
+  return sockets !== undefined && sockets.size > 0;
 };
 
 /**
@@ -121,15 +121,18 @@ const handleDosenConnection = (io, socket, user) => {
   const dosenRoom = `room:dosen_${user.id}`;
   socket.join(dosenRoom);
   
-  // Update online status
-  const currentCount = onlineDosenMap.get(user.id) || 0;
-  onlineDosenMap.set(user.id, currentCount + 1);
-  // Also update generic user online map
-  const userCount = onlineUsersMap.get(user.id) || 0;
-  onlineUsersMap.set(user.id, userCount + 1);
-  
+  // Update onlineDosenMap with this socket id
+  const dosenSockets = onlineDosenMap.get(user.id) || new Set();
+  dosenSockets.add(socket.id);
+  onlineDosenMap.set(user.id, dosenSockets);
+
+  // Also update generic user online map with this socket id
+  const userSockets = onlineUsersMap.get(user.id) || new Set();
+  userSockets.add(socket.id);
+  onlineUsersMap.set(user.id, userSockets);
+
   // Broadcast online status if this is the first connection
-  if (currentCount === 0) {
+  if (dosenSockets.size === 1) {
     io.emit('dosen_status', {
       dosen_id: user.id,
       name: user.name,
@@ -145,9 +148,10 @@ const handleDosenConnection = (io, socket, user) => {
 const handleMahasiswaConnection = async (io, socket, user) => {
   // Mahasiswa can join rooms of approved dosen
   console.log(`Mahasiswa ${user.name} connected`);
-  // Track mahasiswa online count in generic map
-  const userCount = onlineUsersMap.get(user.id) || 0;
-  onlineUsersMap.set(user.id, userCount + 1);
+  // Track mahasiswa socket id in generic map
+  const userSockets = onlineUsersMap.get(user.id) || new Set();
+  userSockets.add(socket.id);
+  onlineUsersMap.set(user.id, userSockets);
 };
 
 /**
@@ -400,33 +404,35 @@ const handleJoinDosenRoom = async (io, socket, user, data) => {
 const handleDisconnect = (io, socket, user) => {
   console.log(`User disconnected: ${user.name} (ID: ${user.id})`);
   
-  // Update dosen online status
-  if (user.role === 'dosen') {
-    const currentCount = onlineDosenMap.get(user.id) || 0;
-    const newCount = Math.max(0, currentCount - 1);
-    
-    if (newCount === 0) {
-      onlineDosenMap.delete(user.id);
-      
-      // Broadcast offline status
-      io.emit('dosen_status', {
-        dosen_id: user.id,
-        name: user.name,
-        is_online: false
-      });
-      console.log(`Dosen ${user.name} is now offline`);
+  // Remove this socket id from the generic user map
+  const userSockets = onlineUsersMap.get(user.id);
+  if (userSockets) {
+    userSockets.delete(socket.id);
+    if (userSockets.size === 0) {
+      onlineUsersMap.delete(user.id);
     } else {
-      onlineDosenMap.set(user.id, newCount);
+      onlineUsersMap.set(user.id, userSockets);
     }
   }
 
-  // Update generic user online map for all users (dosen or mahasiswa)
-  const currentUserCount = onlineUsersMap.get(user.id) || 0;
-  const newUserCount = Math.max(0, currentUserCount - 1);
-  if (newUserCount === 0) {
-    onlineUsersMap.delete(user.id);
-  } else {
-    onlineUsersMap.set(user.id, newUserCount);
+  // If user is dosen, also remove from dosen-specific map and broadcast offline when empty
+  if (user.role === 'dosen') {
+    const dosenSockets = onlineDosenMap.get(user.id);
+    if (dosenSockets) {
+      dosenSockets.delete(socket.id);
+      if (dosenSockets.size === 0) {
+        onlineDosenMap.delete(user.id);
+        // Broadcast offline status
+        io.emit('dosen_status', {
+          dosen_id: user.id,
+          name: user.name,
+          is_online: false
+        });
+        console.log(`Dosen ${user.name} is now offline`);
+      } else {
+        onlineDosenMap.set(user.id, dosenSockets);
+      }
+    }
   }
 };
 
