@@ -222,7 +222,6 @@ const getAllowedMahasiswa = async (req, res) => {
       nim: s.nim,
       status: s.status,
       requested_at: s.created_at,
-      is_online: getOnlineStatus ? getOnlineStatus(s.student_id) : false
     }));
 
     res.status(200).json({

@@ -122,8 +122,7 @@ const options = {
             email: { type: 'string', format: 'email', example: 'ahmad@unsri.ac.id' },
             nim: { type: 'string', example: '09021182126002' },
             status: { type: 'string', enum: ['pending', 'approved', 'rejected'], example: 'approved' },
-            requested_at: { type: 'string', format: 'date-time' },
-            is_online: { type: 'boolean', example: false }
+            requested_at: { type: 'string', format: 'date-time' }
           }
         },
         Error: {

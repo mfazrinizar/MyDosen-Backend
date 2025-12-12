@@ -3,11 +3,8 @@ const { JWT_SECRET } = require('../middleware/authMiddleware');
 const { getOne, runQuery } = require('../config/db');
 const { checkGeofence } = require('../utils/geofence');
 
-// In-memory storage for online dosen socket ids (dosenId -> Set(socketId))
+// In-memory storage for online dosen status (dosenId -> socket count)
 const onlineDosenMap = new Map();
-
-// Generic in-memory storage for online users socket ids (userId -> Set(socketId))
-const onlineUsersMap = new Map();
 
 // In-memory storage for last location save timestamps (userId -> timestamp)
 const lastSaveTimestamps = new Map();
@@ -24,20 +21,8 @@ const LOCATION_LOG_THROTTLE_MS = 3600000;
  * @returns {boolean} Whether the dosen is online
  */
 const isDosenOnline = (dosenId) => {
-  const key = String(dosenId);
-  const sockets = onlineDosenMap.get(key);
-  return sockets !== undefined && sockets.size > 0;
-};
-
-/**
- * Get online status for any user (dosen or mahasiswa)
- * @param {number} userId - The user ID
- * @returns {boolean}
- */
-const isUserOnline = (userId) => {
-  const key = String(userId);
-  const sockets = onlineUsersMap.get(key);
-  return sockets !== undefined && sockets.size > 0;
+  const socketCount = onlineDosenMap.get(dosenId);
+  return socketCount !== undefined && socketCount > 0;
 };
 
 /**
@@ -77,25 +62,6 @@ const initSockets = (io) => {
   io.on('connection', async (socket) => {
     const user = socket.user;
     console.log(`User connected: ${user.name} (ID: ${user.id}, Role: ${user.role})`);
-
-    // Set up inactivity timeout only for dosen (30 seconds)
-    if (user.role === 'dosen') {
-      socket.lastActivity = Date.now();
-      socket.inactivityTimeout = setTimeout(() => {
-        console.log(`Disconnecting socket ${socket.id} for user ${user.name} due to inactivity`);
-        socket.disconnect(true);
-      }, 30000);
-
-      // Reset inactivity timeout on any incoming event
-      socket.onAny(() => {
-        socket.lastActivity = Date.now();
-        clearTimeout(socket.inactivityTimeout);
-        socket.inactivityTimeout = setTimeout(() => {
-          console.log(`Disconnecting socket ${socket.id} for user ${user.name} due to inactivity`);
-          socket.disconnect(true);
-        }, 30000);
-      });
-    }
 
     // Handle Dosen connection
     if (user.role === 'dosen') {
@@ -142,20 +108,12 @@ const handleDosenConnection = (io, socket, user) => {
   const dosenRoom = `room:dosen_${user.id}`;
   socket.join(dosenRoom);
   
-  // Update onlineDosenMap with this socket id
-  const dosenKey = String(user.id);
-  const dosenSockets = onlineDosenMap.get(dosenKey) || new Set();
-  dosenSockets.add(socket.id);
-  onlineDosenMap.set(dosenKey, dosenSockets);
-
-  // Also update generic user online map with this socket id
-  const userKey = String(user.id);
-  const userSockets = onlineUsersMap.get(userKey) || new Set();
-  userSockets.add(socket.id);
-  onlineUsersMap.set(userKey, userSockets);
-
+  // Update online status
+  const currentCount = onlineDosenMap.get(user.id) || 0;
+  onlineDosenMap.set(user.id, currentCount + 1);
+  
   // Broadcast online status if this is the first connection
-  if (dosenSockets.size === 1) {
+  if (currentCount === 0) {
     io.emit('dosen_status', {
       dosen_id: user.id,
       name: user.name,
@@ -171,11 +129,6 @@ const handleDosenConnection = (io, socket, user) => {
 const handleMahasiswaConnection = async (io, socket, user) => {
   // Mahasiswa can join rooms of approved dosen
   console.log(`Mahasiswa ${user.name} connected`);
-  // Track mahasiswa socket id in generic map
-  const userKey = String(user.id);
-  const userSockets = onlineUsersMap.get(userKey) || new Set();
-  userSockets.add(socket.id);
-  onlineUsersMap.set(userKey, userSockets);
 };
 
 /**
@@ -383,7 +336,7 @@ const handleJoinDosenRoom = async (io, socket, user, data) => {
     const dosenName = dosen?.name || 'Unknown';
     
     // Send current dosen status ONLY to this mahasiswa (not broadcast)
-    const isOnline = isUserOnline(dosenId);
+    const isOnline = isDosenOnline(dosenId);
     socket.emit('dosen_status', {
       dosen_id: dosenId,
       name: dosenName,
@@ -428,47 +381,28 @@ const handleJoinDosenRoom = async (io, socket, user, data) => {
 const handleDisconnect = (io, socket, user) => {
   console.log(`User disconnected: ${user.name} (ID: ${user.id})`);
   
-  // Clear inactivity timeout
-  if (socket.inactivityTimeout) {
-    clearTimeout(socket.inactivityTimeout);
-  }
-  
-  // Remove this socket id from the generic user map
-  const userKey = String(user.id);
-  const userSockets = onlineUsersMap.get(userKey);
-  if (userSockets) {
-    userSockets.delete(socket.id);
-    if (userSockets.size === 0) {
-      onlineUsersMap.delete(userKey);
-    } else {
-      onlineUsersMap.set(userKey, userSockets);
-    }
-  }
-
-  // If user is dosen, also remove from dosen-specific map and broadcast offline when empty
+  // Update dosen online status
   if (user.role === 'dosen') {
-    const dosenKey = String(user.id);
-    const dosenSockets = onlineDosenMap.get(dosenKey);
-    if (dosenSockets) {
-      dosenSockets.delete(socket.id);
-      if (dosenSockets.size === 0) {
-        onlineDosenMap.delete(dosenKey);
-        // Broadcast offline status
-        io.emit('dosen_status', {
-          dosen_id: user.id,
-          name: user.name,
-          is_online: false
-        });
-        console.log(`Dosen ${user.name} is now offline`);
-      } else {
-        onlineDosenMap.set(dosenKey, dosenSockets);
-      }
+    const currentCount = onlineDosenMap.get(user.id) || 0;
+    const newCount = Math.max(0, currentCount - 1);
+    
+    if (newCount === 0) {
+      onlineDosenMap.delete(user.id);
+      
+      // Broadcast offline status
+      io.emit('dosen_status', {
+        dosen_id: user.id,
+        name: user.name,
+        is_online: false
+      });
+      console.log(`Dosen ${user.name} is now offline`);
+    } else {
+      onlineDosenMap.set(user.id, newCount);
     }
   }
 };
 
 module.exports = {
   initSockets,
-  isDosenOnline,
-  isUserOnline
+  isDosenOnline
 };
