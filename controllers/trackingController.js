@@ -179,6 +179,64 @@ const handleRequest = async (req, res) => {
 };
 
 /**
+ * Get list of Mahasiswa that are allowed to track this Dosen
+ * Dosen only endpoint
+ */
+const getAllowedMahasiswa = async (req, res) => {
+  try {
+    const lecturerId = req.user.id;
+
+    // Verify the requester is a dosen
+    const dosenProfile = await getOne(
+      'SELECT user_id FROM dosen WHERE user_id = ?',
+      [lecturerId]
+    );
+
+    if (!dosenProfile) {
+      return res.status(403).json({ error: 'Only dosen can view allowed mahasiswa' });
+    }
+
+    // Get approved students with their info
+    const students = await getAll(`
+      SELECT
+        tp.id,
+        tp.student_id,
+        tp.status,
+        tp.created_at,
+        u.name as student_name,
+        u.email as student_email,
+        m.nim
+      FROM tracking_permissions tp
+      JOIN users u ON tp.student_id = u.id
+      JOIN mahasiswa m ON tp.student_id = m.user_id
+      WHERE tp.lecturer_id = ? AND tp.status = 'approved'
+      ORDER BY tp.created_at DESC
+    `, [lecturerId]);
+
+    // Add online status from socket manager
+    const processed = students.map(s => ({
+      id: s.id,
+      student_id: s.student_id,
+      name: s.student_name,
+      email: s.student_email,
+      nim: s.nim,
+      status: s.status,
+      requested_at: s.created_at,
+      is_online: getOnlineStatus ? getOnlineStatus(s.student_id) : false
+    }));
+
+    res.status(200).json({
+      count: processed.length,
+      students: processed
+    });
+
+  } catch (error) {
+    console.error('Get allowed mahasiswa error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
  * Get list of Dosen that mahasiswa is allowed to track
  * Includes location data with geofence masking and online status
  * Mahasiswa only endpoint
@@ -445,6 +503,7 @@ module.exports = {
   getPendingRequests,
   handleRequest,
   getAllowedDosen,
+  getAllowedMahasiswa,
   getAllDosen,
   getMyRequests,
   getLocationHistory,

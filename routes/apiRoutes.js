@@ -559,6 +559,38 @@ router.get('/tracking/pending', verifyToken, requireDosen, trackingController.ge
  */
 router.post('/tracking/handle', verifyToken, requireDosen, trackingController.handleRequest);
 
+/**
+ * @swagger
+ * /tracking/students:
+ *   get:
+ *     tags: [Tracking]
+ *     summary: Get list of Mahasiswa allowed to track this Dosen
+ *     description: Dosen retrieves a list of Mahasiswa who have approved tracking permission for them. Dosen only.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of allowed Mahasiswa
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: integer
+ *                 students:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MahasiswaInfo'
+ *       403:
+ *         description: Dosen access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get('/tracking/students', verifyToken, requireDosen, trackingController.getAllowedMahasiswa);
+
 // ==================== LOCATION HISTORY ROUTES ====================
 
 /**
