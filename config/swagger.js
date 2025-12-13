@@ -113,6 +113,18 @@ const options = {
             last_updated: { type: 'string', format: 'date-time' }
           }
         },
+        MahasiswaInfo: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid', example: '550e8400-e29b-41d4-a716-446655440010' },
+            student_id: { type: 'string', format: 'uuid', example: '550e8400-e29b-41d4-a716-446655440002' },
+            name: { type: 'string', example: 'Ahmad Santoso' },
+            email: { type: 'string', format: 'email', example: 'ahmad@unsri.ac.id' },
+            nim: { type: 'string', example: '09021182126002' },
+            status: { type: 'string', enum: ['pending', 'approved', 'rejected'], example: 'approved' },
+            requested_at: { type: 'string', format: 'date-time' }
+          }
+        },
         Error: {
           type: 'object',
           properties: {
